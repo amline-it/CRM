@@ -1,0 +1,403 @@
+{
+  "key": "custom_service",
+  "version": 1,
+  "name": "قالب سایر خدمات",
+  "description": "قالب پارامتری برای خدمات اختصاصی (فلوچارت: «فرایند اختصاصی خدمت»). هر خدمت جدید = یک نمونه از این تعریف با پارامترهای خودش. نمونه پیوست: استعلام و بررسی سند.",
+  "context": "custom_service",
+  "initial": "service_start",
+  "roles": {
+    "staff": "کارمند/کارشناس CRM",
+    "admin": "مدیر",
+    "system": "موتور و رویدادهای همگام‌سازی سمت سرور اصلی"
+  },
+  "parameters": {
+    "steps": "فهرست مراحل اختصاصی خدمت (کلید و نام)",
+    "requiredDocuments": "مدارک لازم",
+    "requiresPayment": "آیا نیاز به پرداخت/اشتراک دارد",
+    "slaHours": "مهلت انجام هر مرحله"
+  },
+  "states": [
+    {
+      "key": "service_start",
+      "name": "شروع خدمت",
+      "type": "start"
+    },
+    {
+      "key": "service_details",
+      "name": "تکمیل اطلاعات و مدارک خدمت",
+      "type": "process"
+    },
+    {
+      "key": "service_finance",
+      "name": "بررسی شرایط مالی خدمت",
+      "type": "decision"
+    },
+    {
+      "key": "service_finance_error",
+      "name": "خطای مالی و پیگیری",
+      "type": "error",
+      "loop": "service_finance"
+    },
+    {
+      "key": "service_execution",
+      "name": "اجرای مراحل اختصاصی خدمت",
+      "type": "process"
+    },
+    {
+      "key": "service_review",
+      "name": "بررسی و تأیید نتیجه",
+      "type": "process"
+    },
+    {
+      "key": "service_needs_fix",
+      "name": "اعلام نقص و درخواست اصلاح",
+      "type": "error",
+      "loop": "service_execution"
+    },
+    {
+      "key": "service_delivered",
+      "name": "تحویل نتیجه خدمت",
+      "type": "terminal",
+      "outcome": "delivered"
+    },
+    {
+      "key": "service_cancelled",
+      "name": "لغو خدمت",
+      "type": "terminal",
+      "outcome": "cancelled"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "service_info_submitted",
+      "name": "تکمیل اطلاعات و مدارک خدمت",
+      "from": [
+        "service_start"
+      ],
+      "to": "service_details",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "service.info_submitted",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.info_submitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_finance_check",
+      "name": "بررسی شرایط مالی خدمت",
+      "from": [
+        "service_details"
+      ],
+      "to": "service_finance",
+      "kind": "action",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.finance_check"
+          }
+        },
+        {
+          "key": "emit_invoice",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "service_finance_ok",
+      "name": "تأیید شرایط مالی خدمت",
+      "from": [
+        "service_finance",
+        "service_finance_error"
+      ],
+      "to": "service_execution",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "service_finance_ok",
+          "params": {}
+        }
+      ],
+      "triggerEvent": "service.finance_ok",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.finance_ok"
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_finance_failed",
+      "name": "ثبت خطای مالی و پیگیری",
+      "from": [
+        "service_finance"
+      ],
+      "to": "service_finance_error",
+      "kind": "action",
+      "origin": "partner",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "service_finance_ok",
+          "negate": true
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.finance_failed"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری خطای مالی خدمت",
+            "priority": "high",
+            "dueInHours": 4
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_deliver",
+      "name": "اعلام نتیجه اجرای خدمت",
+      "from": [
+        "service_execution"
+      ],
+      "to": "service_review",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.executed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_approved",
+      "name": "تأیید نتیجه خدمت و تحویل",
+      "from": [
+        "service_review"
+      ],
+      "to": "service_delivered",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "service_approved",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.delivered"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "service_delivered"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "delivered"
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_fix_requested",
+      "name": "اعلام نقص و درخواست اصلاح",
+      "from": [
+        "service_review"
+      ],
+      "to": "service_needs_fix",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.needs_fix"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری اصلاح نتیجه خدمت",
+            "priority": "high",
+            "dueInHours": 24
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_redo",
+      "name": "اصلاح و اجرای مجدد",
+      "from": [
+        "service_needs_fix"
+      ],
+      "to": "service_execution",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.redo"
+          }
+        }
+      ]
+    },
+    {
+      "key": "service_cancel",
+      "name": "لغو خدمت",
+      "from": [
+        "service_details",
+        "service_finance",
+        "service_finance_error",
+        "service_execution",
+        "service_review",
+        "service_needs_fix"
+      ],
+      "to": "service_cancelled",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "service.cancelled"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "cancelled"
+          }
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "key": "deed_inquiry",
+      "name": "استعلام و بررسی سند",
+      "parameters": {
+        "steps": [
+          {
+            "key": "inquiry_request",
+            "name": "ارسال درخواست استعلام سند"
+          },
+          {
+            "key": "inquiry_receive",
+            "name": "دریافت پاسخ استعلام"
+          },
+          {
+            "key": "deed_check",
+            "name": "بررسی تطابق سند با مالک و ملک"
+          },
+          {
+            "key": "report",
+            "name": "تهیه گزارش برای متقاضی"
+          }
+        ],
+        "requiredDocuments": [
+          "تصویر سند مالکیت",
+          "کارت ملی مالک",
+          "کد پستی ملک"
+        ],
+        "requiresPayment": true,
+        "slaHours": 72
+      }
+    }
+  ],
+  "crm": {
+    "onTerminal": [
+      {
+        "key": "record_event",
+        "params": {
+          "kind": "crm.timeline"
+        }
+      },
+      {
+        "key": "create_followup_task",
+        "params": {
+          "when": "needsFollowup",
+          "title": "پیگیری خدمت اختصاصی",
+          "priority": "normal",
+          "dueInHours": 72
+        }
+      }
+    ]
+  }
+}

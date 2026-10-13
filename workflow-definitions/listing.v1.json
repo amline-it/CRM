@@ -1,0 +1,452 @@
+{
+  "key": "listing",
+  "version": 1,
+  "name": "فرایند آگهی",
+  "description": "ثبت و انتشار آگهی املاک با بررسی مالی، تکمیل مدارک، بررسی کارشناس و مدیریت وضعیت انتشار. مطابق فلوچارت Crm7LIght (زیرگراف ۳).",
+  "context": "listing",
+  "initial": "listing_start",
+  "roles": {
+    "staff": "کارمند/کارشناس CRM",
+    "admin": "مدیر",
+    "system": "موتور و رویدادهای همگام‌سازی سمت سرور اصلی"
+  },
+  "states": [
+    {
+      "key": "listing_start",
+      "name": "شروع فرایند ثبت آگهی",
+      "type": "start",
+      "node": "AD"
+    },
+    {
+      "key": "listing_finance",
+      "name": "بررسی شرایط مالی مختص آگهی",
+      "type": "process",
+      "node": "ADPAY"
+    },
+    {
+      "key": "listing_info",
+      "name": "تکمیل اطلاعات و مدارک آگهی",
+      "type": "process",
+      "node": "ADINFO"
+    },
+    {
+      "key": "listing_review",
+      "name": "بررسی آگهی توسط کارشناس",
+      "type": "process",
+      "node": "ADREVIEW"
+    },
+    {
+      "key": "listing_result",
+      "name": "نتیجه بررسی آگهی",
+      "type": "decision",
+      "node": "ADRESULT"
+    },
+    {
+      "key": "listing_needs_fix",
+      "name": "اعلام نقص یا علت رد",
+      "type": "error",
+      "node": "ADFIX",
+      "loop": "listing_info"
+    },
+    {
+      "key": "listing_published",
+      "name": "انتشار و مدیریت وضعیت آگهی",
+      "type": "process",
+      "node": "ADPUB"
+    },
+    {
+      "key": "listing_paused",
+      "name": "توقف موقت انتشار",
+      "type": "process"
+    },
+    {
+      "key": "listing_expired",
+      "name": "انقضای آگهی",
+      "type": "terminal",
+      "outcome": "expired"
+    },
+    {
+      "key": "listing_closed",
+      "name": "بسته‌شدن آگهی",
+      "type": "terminal",
+      "outcome": "closed"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "listing_finance_check",
+      "name": "بررسی شرایط مالی آگهی",
+      "from": [
+        "listing_start"
+      ],
+      "to": "listing_finance",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.finance_check"
+          }
+        },
+        {
+          "key": "emit_invoice",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "listing_finance_ok",
+      "name": "تأیید شرایط مالی (پرداخت، اشتراک یا معافیت)",
+      "from": [
+        "listing_finance"
+      ],
+      "to": "listing_info",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "listing_finance_ok",
+          "params": {}
+        }
+      ],
+      "triggerEvent": "listing.finance_ok",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.finance_ok"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_info_submitted",
+      "name": "تکمیل اطلاعات و مدارک آگهی",
+      "from": [
+        "listing_info"
+      ],
+      "to": "listing_review",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "listing_data_complete",
+          "params": {}
+        }
+      ],
+      "triggerEvent": "listing.info_submitted",
+      "effects": [
+        {
+          "key": "queue_for_expert",
+          "params": {
+            "queue": "listings"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.submitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_expert_decision",
+      "name": "ثبت نتیجه بررسی کارشناس",
+      "from": [
+        "listing_review"
+      ],
+      "to": "listing_result",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.reviewed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_needs_fix",
+      "name": "اعلام نقص یا علت رد",
+      "from": [
+        "listing_result"
+      ],
+      "to": "listing_needs_fix",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.needs_fix"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "listing_needs_fix"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری اصلاح آگهی",
+            "priority": "high",
+            "dueInHours": 24
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_resubmitted",
+      "name": "اصلاح و ارسال مجدد آگهی",
+      "from": [
+        "listing_needs_fix"
+      ],
+      "to": "listing_info",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "listing.resubmitted",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.resubmitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_approved",
+      "name": "انتشار آگهی",
+      "from": [
+        "listing_result"
+      ],
+      "to": "listing_published",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "listing_approved",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "publish_listing",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.published"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "listing_published"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_pause",
+      "name": "توقف موقت انتشار",
+      "from": [
+        "listing_published"
+      ],
+      "to": "listing_paused",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "unpublish_listing",
+          "params": {
+            "reason": "paused"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.paused"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_resume",
+      "name": "انتشار مجدد",
+      "from": [
+        "listing_paused"
+      ],
+      "to": "listing_published",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "publish_listing",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.resumed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_expire",
+      "name": "انقضای آگهی",
+      "from": [
+        "listing_published",
+        "listing_paused"
+      ],
+      "to": "listing_expired",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "listing_expired",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "unpublish_listing",
+          "params": {
+            "reason": "expired"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.expired"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "expired"
+          }
+        }
+      ]
+    },
+    {
+      "key": "listing_close",
+      "name": "بستن آگهی (معامله انجام شد یا لغو)",
+      "from": [
+        "listing_published",
+        "listing_paused"
+      ],
+      "to": "listing_closed",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "unpublish_listing",
+          "params": {
+            "reason": "closed"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "listing.closed"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "closed"
+          }
+        }
+      ]
+    }
+  ],
+  "crm": {
+    "onTerminal": [
+      {
+        "key": "record_event",
+        "params": {
+          "kind": "crm.timeline"
+        }
+      },
+      {
+        "key": "create_followup_task",
+        "params": {
+          "when": "needsFollowup",
+          "title": "پیگیری آگهی بسته‌شده",
+          "priority": "normal",
+          "dueInHours": 72
+        }
+      }
+    ]
+  }
+}
