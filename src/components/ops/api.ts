@@ -29,7 +29,7 @@ export function newIdempotencyKey(): string {
 
 export async function opsFetch<T>(
   path: string,
-  options: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; csrf?: string; idempotencyKey?: string } = {},
+  options: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; csrf?: string; idempotencyKey?: string } = {},
 ): Promise<ApiResult<T>> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };

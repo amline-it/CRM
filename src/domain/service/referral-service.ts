@@ -16,6 +16,7 @@
  *  - درخواست تکراری (Idempotency-Key) ارجاع/اعلان تکراری نمی‌سازد.
  */
 import { AppError } from "@/lib/errors";
+import * as BoardColumns from "./board-columns";
 import { KANBAN_ACTION_LABELS, KANBAN_STATUS_LABELS } from "@/lib/fa-labels";
 import { nowIso, transaction } from "@/db/client";
 import { parseJalaliInput } from "@/lib/jalali";
@@ -714,11 +715,16 @@ export interface BoardStats {
 }
 
 export interface Board {
-  units: Array<{ key: string; name: string; description: string | null }>;
+  units: Array<{ key: string; name: string; description: string | null; sortOrder: number }>;
   columns: BoardColumn[];
   inbox: BoardCard[];
   stats: BoardStats;
   filter: BoardFilterInput;
+  /** ترتیب مؤثر ستون‌ها برای بیننده (شخصی یا پیش‌فرض تیم) */
+  columnOrder: string[];
+  columnOrderSource: BoardColumns.ColumnOrderSource;
+  /** بیننده اجازه تغییر ترتیب پیش‌فرض همه را دارد؟ (مدیر) */
+  canSetDefaultOrder: boolean;
 }
 
 function mapReferralNode(
@@ -752,7 +758,9 @@ function mapReferralNode(
 }
 
 export function buildBoard(actor: ActorInfo, filter: BoardFilterInput = {}): Board {
-  const units = Referrals.listOrgUnits();
+  // ستون‌ها بر اساس چیدمان مؤثر بیننده ساخته می‌شوند (ترتیب شخصی یا پیش‌فرض تیم)
+  const layout = BoardColumns.columnLayout(actor.id ?? null);
+  const units = layout.units;
   const staffById = new Map(People.listStaff().map((s) => [s.id, s]));
   const unitName = (key: string | null): string | null => (key ? Referrals.getOrgUnit(key)?.name ?? key : null);
 
@@ -842,7 +850,10 @@ export function buildBoard(actor: ActorInfo, filter: BoardFilterInput = {}): Boa
   const inbox = cards.filter((card) => card.currentUnit === null);
 
   return {
-    units: units.map((u) => ({ key: u.key, name: u.name, description: u.description })),
+    units: units.map((u) => ({ key: u.key, name: u.name, description: u.description, sortOrder: u.sort_order })),
+    columnOrder: layout.order,
+    columnOrderSource: layout.source,
+    canSetDefaultOrder: actor.role === "admin",
     columns,
     inbox,
     stats: {

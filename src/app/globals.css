@@ -888,3 +888,45 @@ button:disabled {
 .inbox-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .inbox-body { font-size: 13px; margin: 6px 0; }
 .inbox-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── چیدمان (جابه‌جایی) ستون‌های کانبان ──────────────────────────────── */
+.kanban-order-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.kanban-col-grip {
+  cursor: grab;
+  opacity: 0.75;
+  font-size: 14px;
+  line-height: 1;
+  margin-inline-end: 6px;
+  user-select: none;
+}
+.kanban-col-head.col-draggable:active .kanban-col-grip { cursor: grabbing; }
+.kanban-col.col-drop-target {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  box-shadow: -6px 0 0 -2px var(--primary);
+}
+.col-shift { display: inline-flex; gap: 2px; }
+.col-shift-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.col-shift-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.24); }
+.col-shift-btn:disabled { opacity: 0.35; cursor: default; }

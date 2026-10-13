@@ -147,6 +147,9 @@ type Board = {
   columns: Array<{ unitKey: string; unitName: string; cards: BoardCard[] }>;
   units: Array<{ key: string; name: string }>;
   stats: { total: number; unassigned: number; overdue: number; unreadMessages: number };
+  columnOrder: string[];
+  columnOrderSource: "personal" | "default";
+  canSetDefaultOrder: boolean;
 };
 
 let adminTicket = "";
@@ -419,6 +422,95 @@ describeIfServer("پذیرش سرتاسری عملیات روی سرور واق�
     expect(body).not.toContain("case_messages");
     expect(body).not.toContain("referralPath");
     expect(body).not.toContain("کانبان");
+  });
+
+  it("جابه‌جایی ستون‌ها: ترتیب شخصی ذخیره/بازنشانی می‌شود، ترتیب پیش‌فرض فقط برای مدیر است", async () => {
+    const legal = client(legalTicket);
+    const initial = await legal.get<Board>("/api/v1/ops/board");
+    expect(initial.status).toBe(200);
+    const keys = initial.data.columnOrder;
+    expect(keys.length).toBe(initial.data.columns.length);
+    expect(initial.data.canSetDefaultOrder).toBe(false);
+
+    // کارمند عادی: جابه‌جایی دو ستون اول و ذخیره روی سرور
+    const swapped = [keys[1], keys[0], ...keys.slice(2)];
+    const saved = await legal.call<{ order: string[]; source: string; canSetDefaultOrder: boolean }>(
+      "PUT",
+      "/api/v1/ops/board/columns",
+      { order: swapped },
+    );
+    expect(saved.status).toBe(200);
+    expect(saved.data.order).toEqual(swapped);
+    expect(saved.data.source).toBe("personal");
+
+    // GET تازه همان ترتیب را می‌دهد و ستون‌ها هم با همان ترتیب ساخته می‌شوند
+    const after = await legal.get<Board>("/api/v1/ops/board");
+    expect(after.data.columnOrder).toEqual(swapped);
+    expect(after.data.columnOrderSource).toBe("personal");
+    expect(after.data.columns.map((c) => c.unitKey)).toEqual(swapped);
+    expect(after.data.units.map((u) => u.key)).toEqual(swapped);
+
+    // همین ترتیب شخصی روی کارمند دیگر اثری ندارد
+    const other = await client(techTicket).get<Board>("/api/v1/ops/board");
+    expect(other.data.columnOrderSource).toBe("default");
+    expect(other.data.columnOrder).toEqual(keys);
+
+    // کارمند عادی نمی‌تواند ترتیب پیش‌فرض همه را تغییر دهد
+    const forbidden = await legal.call("PUT", "/api/v1/ops/board/columns", { order: swapped, scope: "default" });
+    expect(forbidden.status).toBe(403);
+    expect(String(forbidden.raw.message)).toContain("مدیر");
+
+    // مدیریت: ترتیب پیش‌فرض همه
+    const adminClient = client(adminTicket);
+    const asDefault = await adminClient.call<{ order: string[]; source: string }>("PUT", "/api/v1/ops/board/columns", {
+      order: swapped,
+      scope: "default",
+    });
+    expect(asDefault.status).toBe(200);
+    expect(asDefault.data.source).toBe("default");
+    const staffView = await client(techTicket).get<Board>("/api/v1/ops/board");
+    expect(staffView.data.columnOrder).toEqual(swapped);
+
+    // بازنشانی: ترتیب شخصی این کارمند حذف می‌شود و ترتیب پیش‌فرض به حالت اولیه برمی‌گردد
+    const resetPersonal = await legal.call<{ source: string; order: string[] }>("PUT", "/api/v1/ops/board/columns", {
+      reset: true,
+      scope: "personal",
+    });
+    expect(resetPersonal.status).toBe(200);
+    expect(resetPersonal.data.source).toBe("default");
+    const resetDefault = await adminClient.call<{ order: string[] }>("PUT", "/api/v1/ops/board/columns", { reset: true, scope: "default" });
+    expect(resetDefault.status).toBe(200);
+    expect(resetDefault.data.order).not.toEqual(swapped);
+    const finalBoard = await client(techTicket).get<Board>("/api/v1/ops/board");
+    expect(finalBoard.data.columnOrder).toEqual(resetDefault.data.order);
+  });
+
+  it("جابه‌جایی ستون‌ها: ورودی نامعتبر و بدون CSRF رد می‌شود", async () => {
+    const legal = client(legalTicket);
+    const unknown = await legal.call("PUT", "/api/v1/ops/board/columns", { order: ["unit_does_not_exist"] });
+    expect(unknown.status).toBe(400);
+    expect(String(unknown.raw.message)).toContain("ناشناخته");
+
+    const duplicate = await legal.get<Board>("/api/v1/ops/board").then((board) =>
+      legal.call("PUT", "/api/v1/ops/board/columns", { order: [board.data.columnOrder[0], board.data.columnOrder[0]] }),
+    );
+    expect(duplicate.status).toBe(400);
+    expect(String(duplicate.raw.message)).toContain("تکراری");
+
+    // بدون هدر CSRF هیچ تغییری ثبت نمی‌شود
+    const before = (await legal.get<Board>("/api/v1/ops/board")).data.columnOrder;
+    const noCsrf = await fetch(`${BASE}/api/v1/ops/board/columns`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-session-ticket": legalTicket },
+      body: JSON.stringify({ order: [...before].reverse() }),
+    });
+    expect(noCsrf.status).toBe(403);
+    const after = (await legal.get<Board>("/api/v1/ops/board")).data.columnOrder;
+    expect(after).toEqual(before);
+
+    // بدون نشست هم دسترسی نیست
+    const anonymous = await client(null).get("/api/v1/ops/board/columns");
+    expect(anonymous.status).toBe(401);
   });
 
   it("فهرست کارمندان و واحدها برای ارجاع/منشن در دسترس است", async () => {

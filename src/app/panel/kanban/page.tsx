@@ -189,7 +189,7 @@ export default async function KanbanPage({ searchParams }: { searchParams: Promi
         </ActionForm>
       </div>
 
-      <KanbanBoard board={board} csrf={csrf} units={unitsWithStaff} staff={staffList} canManageUnits={isAdmin} />
+      <KanbanBoard board={board} csrf={csrf} units={unitsWithStaff} staff={staffList} />
 
       <div className="card">
         <h3>راهنمای وضعیت‌ها و اعلان‌های عملیات</h3>

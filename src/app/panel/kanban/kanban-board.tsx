@@ -4,10 +4,16 @@
  * تخته کانبان عملیات — ستون = واحد سازمانی، کارت = عملیات واقعی پرونده،
  * وضعیت = فیلد مستقل هر کارت.
  *
- * تغییر ستون (درگ کارت) و تغییر وضعیت فقط از API انجام می‌شود و تا پاسخ موفق
- * سرور، UI تغییری نشان نمی‌دهد؛ در خطا همان وضعیت معتبر قبلی می‌ماند.
+ * دو جابه‌جایی روی تخته انجام می‌شود:
+ *   ۱) **کارت** را بکشید روی ستون واحد مقصد → ارجاع رسمی (تغییر واحد/مسئول).
+ *   ۲) **ستون** را از دستهٔ بالای آن بکشید و جای دیگری رها کنید (یا از دکمه‌های
+ *      ←/→ در سرستون استفاده کنید) → ترتیب ستون‌ها. ترتیب با
+ *      `PUT /api/v1/ops/board/columns` روی سرور ذخیره می‌شود: به‌صورت پیش‌فرض
+ *      چیدمان شخصی همین کارمند و با دکمه «ترتیب پیش‌فرض همه» برای مدیر، ترتیب
+ *      مشترک تیم. تا پاسخ سرور، ترتیب قبلی معتبر است و در خطا برمی‌گردد.
+ * تغییر وضعیت کارت هم فقط از API انجام می‌شود و در خطا وضعیت معتبر قبلی می‌ماند.
  */
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +25,7 @@ import {
   SERVICE_KIND_LABELS,
 } from "@/lib/fa-labels";
 import { relativeFa, toJalaliDateTime } from "@/lib/jalali";
+import { moveColumnKey, shiftColumnKey } from "@/lib/board-order";
 import { opsFetch, newIdempotencyKey } from "@/components/ops/api";
 import { QuickActions, type OpsState, type UnitOption } from "@/components/ops/quick-actions";
 import { Conversation, type ConversationViewData } from "@/components/ops/conversation";
@@ -37,12 +44,13 @@ interface Props {
   csrf: string;
   units: UnitOption[];
   staff: StaffOption[];
-  canManageUnits: boolean;
 }
 
 function statusTone(status: string): string {
   return KANBAN_STATUS_TONE[status] ?? "muted";
 }
+
+type DragPayload = { type: "card" | "column"; id: string };
 
 export function KanbanBoard({ board, csrf, units, staff }: Props) {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -53,6 +61,37 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
   const [, startTransition] = useTransition();
   const router = useRouter();
 
+  /* ── چیدمان ستون‌ها ─────────────────────────────────────────────── */
+  const serverKeys = board.columns.map((column) => column.unitKey);
+  const serverOrder = board.columnOrder.length ? board.columnOrder.filter((key) => serverKeys.includes(key)) : serverKeys;
+  // امضای وضعیت سرور: با هر رفرش/فیلتر تازه، ترتیبِ تأییدشده سرور جایگزین حالت محلی می‌شود
+  const serverSignature = `${serverOrder.join(">")}|${board.inbox.map((card) => card.caseId).join(">")}`;
+  const [local, setLocal] = useState<{ signature: string; order: string[]; source: "personal" | "default" }>({
+    signature: serverSignature,
+    order: serverOrder,
+    source: board.columnOrderSource,
+  });
+  const lastSavedRef = useRef<string[]>([...serverOrder]);
+  const dragRef = useRef<DragPayload | null>(null);
+  const [colDragKey, setColDragKey] = useState<string | null>(null);
+  const [colDropKey, setColDropKey] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  if (local.signature !== serverSignature) {
+    // پاسخ تازه سرور (رفرش تخته) → ترتیب تأییدشده جای حالت محلی را می‌گیرد
+    setLocal({ signature: serverSignature, order: serverOrder, source: board.columnOrderSource });
+    lastSavedRef.current = [...serverOrder];
+  }
+
+  // ترتیب مؤثر برای رندر: کلیدهای چیده‌شده + هر ستونی که در ترتیب نیست (مثلاً واحد تازه)
+  const orderForRender = [
+    ...local.order.filter((key) => serverKeys.includes(key)),
+    ...serverKeys.filter((key) => !local.order.includes(key)),
+  ];
+  const orderedColumns = orderForRender
+    .map((key) => board.columns.find((column) => column.unitKey === key))
+    .filter((column): column is BoardColumn => Boolean(column));
+
   const allCards = [...board.columns.flatMap((c) => c.cards), ...board.inbox];
   const activeCard = activeCardId ? allCards.find((c) => c.caseId === activeCardId) ?? null : null;
 
@@ -61,10 +100,69 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
     startTransition(() => router.refresh());
   }
 
-  /** درگ کارت به ستون واحد مقصد = ارجاع رسمی به همان واحد */
+  /** ذخیره ترتیب ستون‌ها روی سرور؛ در خطا ترتیب تأییدشده قبلی برمی‌گردد */
+  async function persistColumnOrder(nextOrder: string[], scope: "personal" | "default") {
+    setSavingOrder(true);
+    setResult({});
+    const res = await opsFetch<{ order: string[]; source: string }>("/api/v1/ops/board/columns", {
+      method: "PUT",
+      csrf,
+      body: { order: nextOrder, scope },
+    });
+    setSavingOrder(false);
+    if (!res.ok) {
+      const fallback = lastSavedRef.current;
+      setLocal((prev) => ({ signature: prev.signature, order: fallback, source: prev.source }));
+      setResult({ error: `${res.message} — ترتیب ستون‌ها تغییر نکرد` });
+      return;
+    }
+    const confirmed = res.data.order.length ? res.data.order : nextOrder;
+    lastSavedRef.current = [...confirmed];
+    setLocal((prev) => ({
+      signature: prev.signature,
+      order: confirmed,
+      source: res.data.source === "personal" ? "personal" : "default",
+    }));
+    setResult({
+      message:
+        scope === "default"
+          ? "ترتیب ستون‌ها برای همه کارکنان ذخیره شد"
+          : "چیدمان ستون‌های شما ذخیره شد",
+    });
+  }
+
+  function reorderColumn(fromKey: string, toKey: string) {
+    if (fromKey === toKey) return;
+    const next = moveColumnKey(orderForRender, fromKey, toKey);
+    if (next === orderForRender) return;
+    setLocal((prev) => ({ ...prev, order: next }));
+    void persistColumnOrder(next, "personal");
+  }
+
+  function shiftColumn(key: string, direction: "right" | "left") {
+    const next = shiftColumnKey(orderForRender, key, direction);
+    if (next === orderForRender) return;
+    setLocal((prev) => ({ ...prev, order: next }));
+    void persistColumnOrder(next, "personal");
+  }
+
+  /**
+   * رهاکردن روی ستون:
+   *   - اگر ستون کشیده شده باشد → جابه‌جایی ترتیب ستون‌ها
+   *   - اگر کارت کشیده شده باشد → ارجاع رسمی به واحد همان ستون
+   */
   async function dropOnUnit(event: React.DragEvent<HTMLDivElement>, targetUnitKey: string) {
     event.preventDefault();
     setDragOverUnit(null);
+    setColDropKey(null);
+    const payload = dragRef.current;
+    const columnKey = payload?.type === "column" ? payload.id : event.dataTransfer.getData("text/column");
+    if (columnKey) {
+      dragRef.current = null;
+      setColDragKey(null);
+      if (columnKey !== targetUnitKey) reorderColumn(columnKey, targetUnitKey);
+      return;
+    }
     const caseId = event.dataTransfer.getData("text/card") || dragCardId;
     setDragCardId(null);
     if (!caseId) return;
@@ -72,6 +170,7 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
     if (!card) return;
     if (card.currentUnit === targetUnitKey) return;
 
+    dragRef.current = null;
     setBusyCardId(caseId);
     setResult({});
     const targetUnit = board.units.find((u) => u.key === targetUnitKey);
@@ -100,7 +199,87 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
           {board.stats.total} کارت · {board.stats.overdue} عقب‌افتاده · {board.stats.unassigned} بدون مسئول ·{" "}
           {board.stats.unreadMessages} پیام خوانده‌نشده
         </span>
-        <span className="small muted">کارت‌ها را بکشید روی ستون واحد مقصد تا ارجاع رسمی ثبت شود.</span>
+        <span className="small muted">
+          کارت را روی ستون واحد مقصد رها کنید تا ارجاع رسمی ثبت شود · برای جابه‌جایی ستون‌ها، دستهٔ ⠿ سرستون را بکشید یا از
+          دکمه‌های ←/→ استفاده کنید.
+        </span>
+      </div>
+
+      <div className="kanban-order-bar">
+        <span className="small muted">
+          چیدمان ستون‌ها: {local.source === "personal" ? "ترتیب شخصی شما" : "ترتیب پیش‌فرض واحدها"}
+          {savingOrder ? " — در حال ذخیره روی سرور…" : ""}
+        </span>
+        <div className="flex wrap" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="secondary small"
+            disabled={savingOrder}
+            onClick={() => void persistColumnOrder(orderForRender, "personal")}
+          >
+            ذخیره چیدمان من
+          </button>
+          <button
+            type="button"
+            className="secondary small"
+            disabled={savingOrder}
+            onClick={async () => {
+              setSavingOrder(true);
+              setResult({});
+              const res = await opsFetch<{ order: string[] }>("/api/v1/ops/board/columns", {
+                method: "PUT",
+                csrf,
+                body: { reset: true, scope: "personal" },
+              });
+              setSavingOrder(false);
+              if (!res.ok) {
+                setResult({ error: `${res.message} — چیدمان تغییر نکرد` });
+                return;
+              }
+              lastSavedRef.current = [...res.data.order];
+              setLocal((prev) => ({ signature: prev.signature, order: res.data.order, source: "default" }));
+              setResult({ message: "چیدمان شخصی حذف شد؛ ترتیب پیش‌فرض واحدها اعمال است" });
+            }}
+          >
+            بازگشت به ترتیب پیش‌فرض واحدها
+          </button>
+          {board.canSetDefaultOrder ? (
+            <>
+              <button
+                type="button"
+                className="small"
+                disabled={savingOrder}
+                onClick={() => void persistColumnOrder(orderForRender, "default")}
+              >
+                ثبت این ترتیب به‌عنوان پیش‌فرض همه
+              </button>
+              <button
+                type="button"
+                className="secondary small"
+                disabled={savingOrder}
+                onClick={async () => {
+                  setSavingOrder(true);
+                  setResult({});
+                  const res = await opsFetch<{ order: string[] }>("/api/v1/ops/board/columns", {
+                    method: "PUT",
+                    csrf,
+                    body: { reset: true, scope: "default" },
+                  });
+                  setSavingOrder(false);
+                  if (!res.ok) {
+                    setResult({ error: `${res.message} — ترتیب پیش‌فرض تغییر نکرد` });
+                    return;
+                  }
+                  lastSavedRef.current = [...res.data.order];
+                  setLocal((prev) => ({ signature: prev.signature, order: res.data.order, source: "default" }));
+                  setResult({ message: "ترتیب پیش‌فرض واحدها بازنشانی شد" });
+                }}
+              >
+                بازنشانی پیش‌فرض همه
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {result.error ? <div className="alert error">{result.error}</div> : null}
@@ -115,26 +294,61 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
             busyCardId={busyCardId}
             onOpen={(card) => setActiveCardId(card.caseId)}
             onDragStart={(event, card) => {
+              dragRef.current = { type: "card", id: card.caseId };
               event.dataTransfer.setData("text/card", card.caseId);
               event.dataTransfer.effectAllowed = "move";
               setDragCardId(card.caseId);
+              setColDragKey(null);
+              setColDropKey(null);
             }}
             onDragEnd={() => {
+              dragRef.current = null;
               setDragCardId(null);
               setDragOverUnit(null);
             }}
             onDragOver={(event) => {
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
+              if (dragRef.current?.type === "column") {
+                setColDropKey(column.unitKey);
+                setDragOverUnit(null);
+                return;
+              }
               setDragOverUnit(column.unitKey);
             }}
+            onDragLeave={() => setColDropKey((prev) => (prev === column.unitKey ? null : prev))}
             onDrop={(event) => void dropOnUnit(event, column.unitKey)}
+            isColumnDrag={colDragKey === column.unitKey}
+            isColumnDrop={colDropKey === column.unitKey && colDragKey !== column.unitKey}
+            orderBusy={savingOrder}
+            onColumnDragStart={(event) => {
+              dragRef.current = { type: "column", id: column.unitKey };
+              event.dataTransfer.setData("text/column", column.unitKey);
+              event.dataTransfer.effectAllowed = "move";
+              setColDragKey(column.unitKey);
+              setDragCardId(null);
+              setDragOverUnit(null);
+            }}
+            onColumnDragEnd={() => {
+              dragRef.current = null;
+              setColDragKey(null);
+              setColDropKey(null);
+            }}
+            onColumnShift={(direction) => {
+              if (savingOrder) return;
+              shiftColumn(column.unitKey, direction);
+            }}
+            shiftDisabledLeft={orderForRender.indexOf(column.unitKey) >= orderForRender.length - 1}
+            shiftDisabledRight={orderForRender.indexOf(column.unitKey) <= 0}
           />
         ))}
 
         {board.inbox.length ? (
           <div className="kanban-col">
             <div className="kanban-col-head">
+              <span className="kanban-col-grip muted" aria-hidden="true">
+                ·
+              </span>
               <span className="kanban-col-name">بدون واحد سازمانی</span>
               <span className="badge muted">{board.inbox.length}</span>
             </div>
@@ -146,8 +360,14 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
                   card={card}
                   busy={busyCardId === card.caseId}
                   onOpen={() => setActiveCardId(card.caseId)}
-                  onDragStart={() => setDragCardId(card.caseId)}
-                  onDragEnd={() => setDragCardId(null)}
+                  onDragStart={() => {
+                    dragRef.current = { type: "card", id: card.caseId };
+                    setDragCardId(card.caseId);
+                  }}
+                  onDragEnd={() => {
+                    dragRef.current = null;
+                    setDragCardId(null);
+                  }}
                 />
               ))}
             </div>
@@ -181,17 +401,79 @@ interface ColumnProps {
   onDragEnd: () => void;
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  /** در حال کشیده‌شدن همین ستون */
+  isColumnDrag: boolean;
+  /** این ستون مقصد رهاکردن ستون دیگری است */
+  isColumnDrop: boolean;
+  orderBusy: boolean;
+  onDragLeave: () => void;
+  onColumnDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
+  onColumnDragEnd: () => void;
+  onColumnShift: (direction: "right" | "left") => void;
+  shiftDisabledLeft: boolean;
+  shiftDisabledRight: boolean;
 }
 
-function KanbanColumn({ column, isDragOver, busyCardId, onOpen, onDragStart, onDragEnd, onDragOver, onDrop }: ColumnProps) {
+function KanbanColumn({
+  column,
+  isDragOver,
+  busyCardId,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  isColumnDrag,
+  isColumnDrop,
+  orderBusy,
+  onDragLeave,
+  onColumnDragStart,
+  onColumnDragEnd,
+  onColumnShift,
+  shiftDisabledLeft,
+  shiftDisabledRight,
+}: ColumnProps) {
   const overdue = column.cards.filter((c) => c.overdue).length;
+  const className = [
+    "kanban-col",
+    isDragOver ? "drag-over" : "",
+    isColumnDrag ? "dragging-col" : "",
+    isColumnDrop ? "col-drop-target" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={`kanban-col${isDragOver ? " drag-over" : ""}`} onDragOver={onDragOver} onDrop={onDrop}>
-      <div className="kanban-col-head">
+    <div className={className} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+      <div className="kanban-col-head col-draggable" draggable onDragStart={onColumnDragStart} onDragEnd={onColumnDragEnd}>
+        <span className="kanban-col-grip" title="برای جابه‌جایی ستون بکشید" aria-hidden="true">
+          ⠿
+        </span>
         <span className="kanban-col-name">{column.unitName}</span>
         <span className="flex" style={{ gap: 6, alignItems: "center" }}>
           {overdue ? <span className="badge danger">{overdue} عقب‌افتاده</span> : null}
           <span className="badge muted">{column.cards.length}</span>
+          <span className="col-shift">
+            <button
+              type="button"
+              className="col-shift-btn"
+              title="جابه‌جایی ستون به راست"
+              aria-label={`جابه‌جایی ستون ${column.unitName} به راست`}
+              disabled={shiftDisabledRight || orderBusy}
+              onClick={() => onColumnShift("right")}
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              className="col-shift-btn"
+              title="جابه‌جایی ستون به چپ"
+              aria-label={`جابه‌جایی ستون ${column.unitName} به چپ`}
+              disabled={shiftDisabledLeft || orderBusy}
+              onClick={() => onColumnShift("left")}
+            >
+              ‹
+            </button>
+          </span>
         </span>
       </div>
       {column.unitDescription ? <div className="kanban-col-desc">{column.unitDescription}</div> : null}

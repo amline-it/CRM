@@ -5,6 +5,7 @@ import { toErrorResponse, AppError } from "@/lib/errors";
 import { assertCsrf, requirePermission, type CurrentSession } from "@/auth/session";
 import * as Referrals from "@/db/repos/referrals";
 import * as Svc from "@/domain/service/referral-service";
+import * as Columns from "@/domain/service/board-columns";
 import type { ActorContext } from "@/domain/engine/types";
 
 export interface ActionState {
@@ -107,7 +108,10 @@ export async function createKanbanCardAction(_prev: ActionState, form: FormData)
   }
 }
 
-/* ── بازچینش ترتیب ستون‌ها (واحدها) — درگ‌انددراپ ستون‌ها ────────────── */
+/* ── بازچینش ترتیب ستون‌ها (واحدها) — درگ‌انددراپ ستون‌ها ──────────────
+ * مسیر اصلی UI از API ops (`PUT /api/v1/ops/board/columns`) استفاده می‌کند؛ این
+ * اکشن سرور هم همان سرویس مشترک چیدمان را صدا می‌زند تا دو پیاده‌سازی واگرا نشوند.
+ */
 
 export async function reorderOrgUnitsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
@@ -117,13 +121,7 @@ export async function reorderOrgUnitsAction(_prev: ActionState, form: FormData):
     if (!order) return { error: "ترتیب ستون‌ها مشخص نیست" };
     const keys = order.split(",").map((k) => k.trim()).filter(Boolean);
     if (!keys.length) return { error: "ترتیب ستون‌ها خالی است" };
-    for (const key of keys) {
-      if (!Referrals.getOrgUnit(key)) return { error: `واحد نامعتبر: ${key}` };
-    }
-    keys.forEach((key, index) => {
-      const unit = Referrals.getOrgUnit(key);
-      if (unit) Referrals.updateOrgUnit(unit.id, { sortOrder: index });
-    });
+    Columns.saveDefaultColumnOrder(keys);
     revalidatePath(KANBAN_REVALIDATE);
     return { message: "ترتیب ستون‌های کانبان ذخیره شد" };
   } catch (err) {
