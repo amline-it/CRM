@@ -192,4 +192,39 @@ describeIfServer("مسیر کامل کاربر در مرورگر (شبیه‌س�
     expect(second.bounced).toBe(false);
     expect(second.status).toBe(200);
   });
+  it("خروج کامل → ورود دوباره: توکن قبلی بی‌اثر می‌شود و چرخه درست کار می‌کند", async () => {
+    const browser = makeBrowser({ cookiesAllowed: false });
+    const bridge = createSessionBridge(createWindowScope(browser.win));
+
+    // ورود اول
+    const firstTicket = await loginAndGetTicket(browser);
+    expect(firstTicket).not.toBe("");
+    bridge.activate(firstTicket, { keepInUrl: true });
+    browser.win.location.assign(bridge.decorateUrl("/panel"));
+    const panel = await browser.loadDocument(browser.currentUrl());
+    expect(panel.status).toBe(200);
+
+    // خروج کامل از مسیر /logout (همان دکمه «خروج» پنل)
+    const logout = await browser.win.fetch(`${BASE}/logout`, { headers: { accept: "text/html" } });
+    expect(logout.status).toBe(200);
+    expect(logout.headers.get("clear-site-data") ?? "").toContain("cookies");
+    expect(await logout.text()).toContain("خروج");
+
+    // توکن قبلی دیگر بی‌اثر است
+    const revoked = await browser.win.fetch(`${BASE}/panel/cases`, { redirect: "manual" });
+    expect(revoked.status).not.toBe(200);
+
+    // ورود دوباره با توکن تازه
+    bridge.deactivate();
+    const secondTicket = await loginAndGetTicket(browser);
+    expect(secondTicket).not.toBe("");
+    expect(secondTicket).not.toBe(firstTicket);
+    bridge.activate(secondTicket, { keepInUrl: true });
+    browser.win.location.assign(bridge.decorateUrl("/panel"));
+    const again = await browser.loadDocument(browser.currentUrl());
+    expect(again.bounced).toBe(false);
+    expect(again.status).toBe(200);
+    const cases = await browser.win.fetch(`${BASE}/panel/cases`);
+    expect(cases.status).toBe(200);
+  });
 });

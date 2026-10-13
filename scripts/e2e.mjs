@@ -363,6 +363,45 @@ async function main() {
     `status=${forged.status}`,
   );
 
+  /* ── ۵) خروج کامل و ورود دوباره ─────────────────────────────────── */
+  console.log("\n۵) خروج کامل و ورود دوباره");
+
+  const logoutResponse = await fetch(`${BASE}/logout`, {
+    headers: { "x-session-ticket": ticket },
+    redirect: "manual",
+  });
+  const logoutBody = await logoutResponse.text();
+  check("مسیر خروج پاسخ می‌دهد", logoutResponse.status === 200, `status=${logoutResponse.status}`);
+  check(
+    "دستور پاک‌سازی کوکی/حافظه مرورگر ارسال می‌شود",
+    (logoutResponse.headers.get("clear-site-data") ?? "").includes("cookies") ||
+      (logoutResponse.headers.get("clear-site-data") ?? "").includes("storage"),
+    logoutResponse.headers.get("clear-site-data") ?? "-",
+  );
+  check("صفحه خروج پیام فارسی دارد", logoutBody.includes("خروج"), logoutBody.slice(0, 60));
+
+  const revokedPanel = await fetch(`${BASE}/panel?t=${encodeURIComponent(ticket)}`, { redirect: "manual" });
+  const revokedApi = await fetch(`${BASE}/api/auth/session`, { headers: { "x-session-ticket": ticket } });
+  check(
+    "توکن پیش از خروج پس از خروج بی‌اثر است",
+    revokedPanel.status !== 200 && revokedApi.status === 401,
+    `${revokedPanel.status}/${revokedApi.status}`,
+  );
+
+  // ورود دوباره با همان مسیر فرم
+  const loginPageAgain = await fetch(`${BASE}/login`).then((response) => response.text());
+  const fieldsAgain = extractHiddenFields(loginPageAgain);
+  const reloginForm = new FormData();
+  for (const [key, value] of Object.entries(fieldsAgain)) reloginForm.set(key, value);
+  reloginForm.set("username", "admin");
+  reloginForm.set("password", "Admin@1234");
+  reloginForm.set("sso_token", "");
+  const reloginResponse = await fetch(`${BASE}/login`, { method: "POST", body: reloginForm, redirect: "manual" });
+  const reTicket = (await reloginResponse.text()).match(/eyJhbGciOiJIUzI1NiJ9[A-Za-z0-9_.\-]+/)?.[0] ?? "";
+  check("ورود دوباره توکن تازه می‌دهد", Boolean(reTicket) && reTicket !== ticket);
+  const rePanel = await fetch(`${BASE}/panel?t=${encodeURIComponent(reTicket)}`, { redirect: "manual" });
+  check("پنل با توکن تازه باز می‌شود", rePanel.status === 200, `status=${rePanel.status}`);
+
 
   /* ── جمع‌بندی ───────────────────────────────────────────────────── */
   console.log(`\n═══ نتیجه: ${passed} موفق، ${failed} ناموفق ═══`);

@@ -68,8 +68,13 @@ export async function login(input: LoginInput): Promise<{ ok: true; session: Cur
 
 export async function logout(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value ?? ((await headerListSafe())?.ticket ?? null);
-  if (token) People.revokeSession(tokenHash(token));
+  // ممکن است هم کوکی و هم توکن هدر وجود داشته باشد (یکی کهنه و یکی تازه)؛
+  // هر دو نشست باطل می‌شوند تا خروج واقعاً کامل باشد.
+  const cookieToken = jar.get(SESSION_COOKIE)?.value ?? null;
+  const headerTicket = (await headerListSafe())?.ticket ?? null;
+  for (const token of new Set([cookieToken, headerTicket])) {
+    if (token) People.revokeSession(tokenHash(token));
+  }
   jar.delete(SESSION_COOKIE);
 }
 

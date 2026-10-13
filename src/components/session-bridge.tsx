@@ -160,22 +160,18 @@ export function SessionBridge() {
   return null;
 }
 
-/** دکمه خروج: باطل‌کردن نشست در سرور + پاک‌کردن توکن مرورگر */
+/**
+ * دکمه خروج: ابتدا توکن محلی مرورگر پاک می‌شود، سپس به مسیر /logout می‌رویم که
+ * نشست را در سرور باطل می‌کند و کوکی/حافظه/کش مرورگر را هم پاک می‌کند.
+ */
 export function LogoutButton({ label = "خروج", className = "btn secondary small" }: { label?: string; className?: string }) {
   return (
     <button
       type="button"
       className={className}
-      onClick={async () => {
-        const active = getSessionBridge();
-        try {
-          if (active) await active.fetchWithoutTicket("/api/auth/session", { method: "DELETE" });
-          else await fetch("/api/auth/session", { method: "DELETE" });
-        } catch {
-          /* نادیده */
-        }
-        active?.deactivate();
-        window.location.assign("/login");
+      onClick={() => {
+        clearSessionTicket();
+        window.location.assign("/logout");
       }}
     >
       {label}
