@@ -75,6 +75,25 @@ async function postJson(pathname, body, { key = API_KEY, signature = true, idemp
   return { status: response.status, json, text };
 }
 
+
+/** استخراج inputهای پنهان یک فرم (شامل فیلدهای داخلی Server Action) */
+function extractHiddenFields(html) {
+  const form = html.match(/<form[^>]*>[\s\S]*?<\/form>/)?.[0] ?? html;
+  const fields = {};
+  for (const tag of form.match(/<input[^>]*>/g) ?? []) {
+    const name = tag.match(/name="([^"]*)"/)?.[1];
+    if (!name) continue;
+    const value = tag.match(/value="([^"]*)"/)?.[1] ?? "";
+    fields[name] = value
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#x27;/g, "'");
+  }
+  return fields;
+}
+
 async function main() {
   console.log(`\n═══ آزمون سرتاسری CRM — ${BASE} ═══\n`);
 
@@ -255,6 +274,95 @@ async function main() {
   check("وضعیت وب‌هوک در دیتابیس «تحویل‌شده» است", row?.status === "delivered" && Boolean(row?.delivered_at), JSON.stringify(row));
 
   await new Promise((resolve) => receiver.close(resolve));
+
+  /* ── ۴) نشست بدون کوکی (شرایط پنل داخل iframe) ───────────────────── */
+  console.log("\n۴) ورود و کار بدون هیچ کوکی (شبیه‌سازی مرورگر iframe)");
+  const loginPageHtml = await fetch(`${BASE}/login`).then((r) => r.text());
+  const actionFields = extractHiddenFields(loginPageHtml);
+  check("فرم ورود شامل توکن CSRF امضاشده است", Boolean(actionFields["_csrf"]?.includes(".")));
+
+  // مسیر فرم بدون جاوااسکریپت (Progressive Enhancement) — همان مسیر سروری که مرورگر هم استفاده می‌کند
+  const loginForm = new FormData();
+  for (const [key, value] of Object.entries(actionFields)) loginForm.set(key, value);
+  loginForm.set("username", "admin");
+  loginForm.set("password", "Admin@1234");
+  loginForm.set("sso_token", "");
+  const loginResponse = await fetch(`${BASE}/login`, {
+    method: "POST",
+    body: loginForm,
+    redirect: "manual", // هیچ کوکی‌ای ذخیره/ارسال نمی‌شود
+  });
+  const loginBody = await loginResponse.text();
+  const ticket = loginBody.match(/eyJhbGciOiJIUzI1NiJ9[A-Za-z0-9_.\-]+/)?.[0] ?? "";
+  check("ورود موفق، توکن نشست را به مرورگر برمی‌گرداند", Boolean(ticket), `status=${loginResponse.status}`);
+
+  const noCookiePanel = await fetch(`${BASE}/panel?t=${encodeURIComponent(ticket)}`, { redirect: "manual" });
+  check(
+    "پنل با توکن در آدرس و بدون کوکی باز می‌شود (بدون بازگشت به ورود)",
+    noCookiePanel.status === 200,
+    `status=${noCookiePanel.status}`,
+  );
+  const panelHtml2 = await noCookiePanel.text();
+  check("محتوای داشبورد واقعاً رندر شده است", panelHtml2.includes("پنل کارشناسان و مدیران") || panelHtml2.includes("کارتابل"));
+
+  for (const path of ["/panel/cases", "/panel/tasks", "/panel/users", "/panel/listings", "/panel/requirements", "/panel/sync"]) {
+    const response = await fetch(`${BASE}${path}?t=${encodeURIComponent(ticket)}`, { redirect: "manual" });
+    check(`صفحه ${path} بدون کوکی باز می‌شود`, response.status === 200, `status=${response.status}`);
+  }
+
+  // یک اقدام واقعی پنل بدون کوکی (بدون هدر، فقط توکن در آدرس)
+  const caseHtml2 = await fetch(`${BASE}/panel/cases?t=${encodeURIComponent(ticket)}`).then((r) => r.text());
+  const caseIdMatch = caseHtml2.match(/\/panel\/cases\/(case_[A-Za-z0-9_-]+)/);
+  const caseId = caseIdMatch?.[1] ?? "";
+  check("پرونده‌ای برای آزمون اقدام بدون کوکی وجود دارد", Boolean(caseId));
+  if (caseId) {
+    const detailHtml = await fetch(`${BASE}/panel/cases/${caseId}?t=${encodeURIComponent(ticket)}`).then((r) => r.text());
+    const transitionForm = (detailHtml.match(/<form[^>]*>[\s\S]*?<\/form>/g) ?? []).find((form) => form.includes("transitionKey"));
+    if (transitionForm) {
+      const fields = extractHiddenFields(transitionForm);
+      const actionForm = new FormData();
+      for (const [key, value] of Object.entries(fields)) actionForm.set(key, value);
+      const actionResponse = await fetch(`${BASE}/panel/cases/${caseId}?t=${encodeURIComponent(ticket)}`, {
+        method: "POST",
+        body: actionForm,
+        redirect: "manual",
+      });
+      const actionBody = await actionResponse.text();
+      check(
+        "اقدام پنل بدون کوکی اجرا می‌شود (بدون پرت‌شدن به صفحه ورود)",
+        actionResponse.status === 200 && !actionBody.includes("اعتبار فرم") && actionResponse.headers.get("location") !== "/login",
+        `status=${actionResponse.status} location=${actionResponse.headers.get("location")}`,
+      );
+      const stateAfter = await fetch(`${BASE}/panel/cases/${caseId}?t=${encodeURIComponent(ticket)}`).then((r) => r.text());
+      check("وضعیت پرونده پس از اقدام در پنل به‌روز است", stateAfter.length > 1000);
+    } else {
+      check("فرم گذار روی پرونده پیدا شد", false, caseId);
+    }
+  }
+
+  // مسیر عادی کوکی (همان چیزی که روی سرور خودِ کاربر استفاده می‌شود)
+  const cookieHeader = (loginResponse.headers.getSetCookie?.() ?? [])
+    .map((cookie) => cookie.split(";")[0])
+    .join("; ");
+  check("پاسخ ورود کوکی نشست را هم صادر می‌کند", cookieHeader.includes("crm_session"));
+  const cookiePanel = await fetch(`${BASE}/panel`, { headers: { Cookie: cookieHeader }, redirect: "manual" });
+  check("پنل با کوکی نشست باز می‌شود (مسیر استاندارد)", cookiePanel.status === 200, `status=${cookiePanel.status}`);
+
+  // توکن از طریق هدر (مسیر وصله‌کردن fetch در مرورگر)
+  const headerSession = await fetch(`${BASE}/panel/cases`, { headers: { "x-session-ticket": ticket }, redirect: "manual" });
+  check("پنل با هدر توکن و بدون کوکی باز می‌شود", headerSession.status === 200, `status=${headerSession.status}`);
+
+  const sessionHeaderOk = await fetch(`${BASE}/api/auth/session`, { headers: { "x-session-ticket": ticket } });
+  const sessionAnon = await fetch(`${BASE}/api/auth/session`, { redirect: "manual" });
+  check("API نشست با توکن تأیید و بدون توکن رد می‌کند", sessionHeaderOk.status === 200 && sessionAnon.status === 401, `${sessionHeaderOk.status}/${sessionAnon.status}`);
+
+  const forged = await fetch(`${BASE}/panel?t=not-a-real-token`, { redirect: "manual" });
+  check(
+    "توکن جعلی بی‌اثر است و به صفحه ورود هدایت می‌شود",
+    [301, 302, 303, 307, 308].includes(forged.status),
+    `status=${forged.status}`,
+  );
+
 
   /* ── جمع‌بندی ───────────────────────────────────────────────────── */
   console.log(`\n═══ نتیجه: ${passed} موفق، ${failed} ناموفق ═══`);

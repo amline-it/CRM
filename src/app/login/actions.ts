@@ -20,6 +20,15 @@ export interface LoginState {
 }
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  try {
+    return await loginActionInner(_prev, formData);
+  } catch (err) {
+    console.error("[loginAction] خطای غیرمنتظره:", err);
+    return { error: `خطای داخلی: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+async function loginActionInner(_prev: LoginState, formData: FormData): Promise<LoginState> {
   ensureMigrated();
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");

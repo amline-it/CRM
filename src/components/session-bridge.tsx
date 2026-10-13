@@ -1,97 +1,112 @@
 "use client";
 
 /**
- * پل نشست سمت مرورگر:
- *  ۱) توکن جلسه را (بعد از ورود) در localStorage نگه می‌دارد،
- *  ۲) آن را به سرویس‌ورکر می‌دهد تا روی درخواست‌ها هدر شود،
- *  ۳) اگر کوکی مسدود باشد و کاربر به صفحه ورود پرت شده باشد، با همان توکن برمی‌گرداند.
- *
- * این مسیر در سرور خودکار است: اگر کوکی کار کند هیچ تفاوتی حس نمی‌شود.
+ * پل نشست سمت React:
+ *  - وصله‌کردن fetch/تاریخ مرورگر با توکن نشست (بدون نیاز به کوکی یا سرویس‌ورکر)
+ *  - اگر کاربر با توکن معتبر به صفحه ورود برگشت، خودکار به پنل برمی‌گردد
+ *  - دکمه خروج که هم نشست سرور و هم توکن مرورگر را پاک می‌کند
  */
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  createSessionBridge,
+  ticketFromUrl,
+  TICKET_STORAGE_KEY,
+  type SessionBridge,
+  type BridgeScope,
+} from "./session-bridge-core";
 
-const TICKET_KEY = "crm_session_ticket";
+let bridge: SessionBridge | null = null;
 
-export function readSessionTicket(): string | null {
+function browserScope(): BridgeScope | null {
+  if (typeof window === "undefined") return null;
+  let storage: Storage | null = null;
   try {
-    return window.localStorage.getItem(TICKET_KEY);
+    storage = window.localStorage;
+    // آزمایش دسترسی: در iframe با origin نامعتبر، دسترسی پرتاب خطا می‌کند
+    storage.getItem(TICKET_STORAGE_KEY);
   } catch {
-    return null;
+    storage = null;
   }
+  return {
+    fetch: window.fetch.bind(window),
+    location: {
+      href: window.location.href,
+      origin: window.location.origin,
+      assign: (url: string) => window.location.assign(url),
+      replace: (url: string) => window.location.replace(url),
+    },
+    history: window.history,
+    storage,
+  };
 }
 
-export function saveSessionTicket(ticket: string): void {
-  try {
-    window.localStorage.setItem(TICKET_KEY, ticket);
-  } catch {
-    /* ذخیره‌سازی مسدود است */
-  }
+/** پل نشست مشترک در کل تب (تنبل ساخته می‌شود) */
+export function getSessionBridge(): SessionBridge | null {
+  if (bridge) return bridge;
+  const scope = browserScope();
+  if (!scope) return null;
+  bridge = createSessionBridge(scope);
+  return bridge;
+}
+
+/** خواندن توکن: آدرس → حافظه → ذخیره‌سازی */
+export function readSessionTicket(): string | null {
+  return getSessionBridge()?.currentTicket() ?? null;
+}
+
+/** نگه‌داشتن توکن نشست در مرورگر (برای مسیر بدون کوکی) */
+export function saveSessionTicket(ticket: string, keepInUrl = true): void {
+  getSessionBridge()?.activate(ticket, { keepInUrl });
 }
 
 export function clearSessionTicket(): void {
-  try {
-    window.localStorage.removeItem(TICKET_KEY);
-  } catch {
-    /* نادیده */
-  }
+  getSessionBridge()?.deactivate();
 }
 
-/** ثبت سرویس‌ورکر و دادن توکن به آن (تا روی همه درخواست‌ها هدر شود) */
-export async function syncTicketToWorker(ticket: string | null): Promise<boolean> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
+/**
+ * بررسی اینکه کوکی نشست واقعاً کار می‌کند یا نه (بدون هدر توکن).
+ * اگر پاسخ ۲۰۰ باشد یعنی مرورگر کوکی را می‌فرستد و نیازی به مسیر جایگزین نیست.
+ */
+export async function cookiesWork(): Promise<boolean> {
+  const active = getSessionBridge();
   try {
-    const registration = await navigator.serviceWorker.register("/session-worker.js", { scope: "/" });
-    await navigator.serviceWorker.ready;
-    const target = navigator.serviceWorker.controller ?? registration.active ?? registration.waiting;
-    if (!target) return false;
-    await new Promise<void>((resolve) => {
-      const channel = new MessageChannel();
-      const timer = setTimeout(() => resolve(), 3000);
-      channel.port1.onmessage = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      target.postMessage({ type: "set-ticket", ticket: ticket ?? "" }, [channel.port2]);
-    });
-    // اطمینان از اینکه نسخه فعال ورکر، کوکی/هدر را روی درخواست بعدی می‌گذارد
-    if (navigator.serviceWorker.controller !== target) {
-      await new Promise<void>((resolve) => {
-        const onControllerChange = () => {
-          navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-          resolve();
-        };
-        navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-        setTimeout(resolve, 3000);
-      });
-    }
-    return true;
+    const request = (url: string, init?: RequestInit) =>
+      active ? active.fetchWithoutTicket(url, init) : fetch(url, init);
+    const response = await request("/api/auth/session", { credentials: "include", cache: "no-store" });
+    return response.ok;
   } catch {
     return false;
   }
 }
 
-/**
- * ورود بدون کوکی: بررسی می‌کند توکن ذخیره‌شده معتبر است یا نه.
- * اگر معتبر بود، کاربر را به پنل برمی‌گرداند (بدون حلقه بی‌پایان با صفحه ورود).
- */
 export function SessionBridge() {
   const router = useRouter();
   const pathname = usePathname();
   const running = useRef(false);
 
   useEffect(() => {
-    const ticket = readSessionTicket();
-    if (!ticket || running.current) return;
-    const onLoginish = pathname === "/login" || pathname === "/";
+    const active = getSessionBridge();
+    if (!active || running.current) return;
+
+    const fromUrl = ticketFromUrl({ ...(browserScope() as BridgeScope) });
+    const ticket = fromUrl ?? active.ticketFromStorage();
+    if (!ticket) return;
+
     running.current = true;
+    // توکن موجود = حالت بدون کوکی فعال شود (fetch و آدرس هر دو)
+    active.activate(ticket, { keepInUrl: true });
+
+    const onGuestPage = pathname === "/login" || pathname === "/";
+    if (!onGuestPage) {
+      running.current = false;
+      return;
+    }
 
     (async () => {
-      const workerReady = await syncTicketToWorker(ticket);
-      if (!onLoginish) return;
       let valid = false;
       try {
-        const response = await fetch("/api/auth/session", {
+        const response = await active.fetchWithoutTicket("/api/auth/session", {
           headers: { "x-session-ticket": ticket },
           cache: "no-store",
         });
@@ -99,14 +114,23 @@ export function SessionBridge() {
       } catch {
         valid = false;
       }
+
       if (valid) {
-        router.replace("/panel");
-        router.refresh();
-      } else {
-        // توکن باطل/منقضی: پاک می‌شود تا کاربر با فرم ورود ادامه دهد
-        clearSessionTicket();
-        await syncTicketToWorker(null);
+        // ناوبری کامل (نه SPA) تا توکن در درخواست سند هم حضور داشته باشد
+        const target = active.decorateUrl("/panel");
+        window.location.assign(target);
+        return;
       }
+      // توکن باطل/منقضی: پاک‌سازی تا کاربر با فرم ورود ادامه دهد
+      active.deactivate();
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("t");
+        window.history.replaceState(window.history.state, "", url.pathname + url.search);
+      } catch {
+        /* نادیده */
+      }
+      router.refresh();
     })().finally(() => {
       running.current = false;
     });
@@ -115,23 +139,22 @@ export function SessionBridge() {
   return null;
 }
 
-/** دکمه خروج: ابتدا نشست در سرور باطل می‌شود، سپس توکن مرورگر پاک می‌شود */
+/** دکمه خروج: باطل‌کردن نشست در سرور + پاک‌کردن توکن مرورگر */
 export function LogoutButton({ label = "خروج", className = "btn secondary small" }: { label?: string; className?: string }) {
-  const router = useRouter();
   return (
     <button
       type="button"
       className={className}
       onClick={async () => {
+        const active = getSessionBridge();
         try {
-          await fetch("/api/auth/session", { method: "DELETE" });
+          if (active) await active.fetchWithoutTicket("/api/auth/session", { method: "DELETE" });
+          else await fetch("/api/auth/session", { method: "DELETE" });
         } catch {
           /* نادیده */
         }
-        clearSessionTicket();
-        await syncTicketToWorker(null);
-        router.replace("/login");
-        router.refresh();
+        active?.deactivate();
+        window.location.assign("/login");
       }}
     >
       {label}
