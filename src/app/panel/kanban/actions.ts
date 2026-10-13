@@ -105,6 +105,31 @@ export async function createKanbanCardAction(_prev: ActionState, form: FormData)
   }
 }
 
+/* ── بازچینش ترتیب ستون‌ها (واحدها) — درگ‌انددراپ ستون‌ها ────────────── */
+
+export async function reorderOrgUnitsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    await assertCsrf(form);
+    await requirePermission("referral.manage");
+    const order = text(form, "order");
+    if (!order) return { error: "ترتیب ستون‌ها مشخص نیست" };
+    const keys = order.split(",").map((k) => k.trim()).filter(Boolean);
+    if (!keys.length) return { error: "ترتیب ستون‌ها خالی است" };
+    for (const key of keys) {
+      if (!Referrals.getOrgUnit(key)) return { error: `واحد نامعتبر: ${key}` };
+    }
+    keys.forEach((key, index) => {
+      const unit = Referrals.getOrgUnit(key);
+      if (unit) Referrals.updateOrgUnit(unit.id, { sortOrder: index });
+    });
+    revalidatePath(KANBAN_REVALIDATE);
+    return { message: "ترتیب ستون‌های کانبان ذخیره شد" };
+  } catch (err) {
+    const { body } = toErrorResponse(err);
+    return { error: String(body.message ?? "خطای بازچینش ستون‌ها") };
+  }
+}
+
 /* ── مدیریت واحدهای سازمانی (مدیر) ─────────────────────────────────── */
 
 export async function manageOrgUnitAction(_prev: ActionState, form: FormData): Promise<ActionState> {

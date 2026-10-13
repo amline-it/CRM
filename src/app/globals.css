@@ -800,3 +800,15 @@ button:disabled {
   padding: 12px;
   background: var(--surface-2);
 }
+
+/* حالت‌های درگ‌انددراپ کانبان */
+.kanban-col.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: -4px;
+  background: var(--primary-soft);
+}
+.kanban-col.dragging-col { opacity: 0.55; }
+.kanban-col-head.col-draggable { cursor: grab; }
+.kanban-col-head.col-draggable:active { cursor: grabbing; }
+.kard.dragging { opacity: 0.5; transform: rotate(1deg); cursor: grabbing; }
+.kard[draggable="true"] { cursor: grab; }

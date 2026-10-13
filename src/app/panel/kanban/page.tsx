@@ -118,7 +118,7 @@ export default async function KanbanPage() {
         </div>
       ) : null}
 
-      <KanbanBoard board={board} staff={staffList} csrf={csrf} />
+      <KanbanBoard board={board} staff={staffList} csrf={csrf} canManageUnits={isAdmin} />
     </>
   );
 }

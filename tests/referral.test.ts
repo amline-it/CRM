@@ -164,3 +164,25 @@ describe("ارجاع مجدد", () => {
     expect(Cases.findCaseById(caseId)!.kanban_status).toBe("new");
   });
 });
+
+describe("بازچینش ترتیب ستون‌ها (واحدها)", () => {
+  it("تغییر sort_order ترتیب ستون‌های تخته را تغییر می‌دهد", () => {
+    const legal = Referrals.getOrgUnit("legal")!;
+    const reception = Referrals.getOrgUnit("reception")!;
+    const finance = Referrals.getOrgUnit("finance")!;
+
+    Referrals.updateOrgUnit(legal.id, { sortOrder: 0 });
+    Referrals.updateOrgUnit(reception.id, { sortOrder: 1 });
+    Referrals.updateOrgUnit(finance.id, { sortOrder: 2 });
+
+    const board = Svc.buildBoard({ id: legalStaff, role: "staff", unit: "legal", name: "حقوقی" });
+    expect(board.units[0].key).toBe("legal");
+    expect(board.units[1].key).toBe("reception");
+    expect(board.units[2].key).toBe("finance");
+
+    // بازگرداندن به ترتیب اولیه
+    Referrals.updateOrgUnit(reception.id, { sortOrder: 1 });
+    Referrals.updateOrgUnit(legal.id, { sortOrder: 2 });
+    Referrals.updateOrgUnit(finance.id, { sortOrder: 3 });
+  });
+});

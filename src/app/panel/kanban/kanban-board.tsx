@@ -10,8 +10,8 @@ import {
   KANBAN_ACTION_LABELS,
 } from "@/lib/fa-labels";
 import { relativeFa } from "@/lib/jalali";
-import type { Board, BoardCard } from "@/domain/service/referral-service";
-import { referAction, actAction } from "./actions";
+import type { Board, BoardCard, BoardColumn } from "@/domain/service/referral-service";
+import { referAction, actAction, reorderOrgUnitsAction } from "./actions";
 
 interface StaffOption {
   id: string;
@@ -21,56 +21,179 @@ interface StaffOption {
   unitName: string | null;
 }
 
-interface Props {
-  board: Board;
-  staff: StaffOption[];
-  csrf: string;
-}
-
 interface UnitOption {
   key: string;
   name: string;
 }
 
+interface Props {
+  board: Board;
+  staff: StaffOption[];
+  csrf: string;
+  canManageUnits: boolean;
+}
+
 const STATUS_ORDER = ["new", "in_review", "waiting_info", "returned_correction", "done"] as const;
 
-export function KanbanBoard({ board, staff, csrf }: Props) {
+export function KanbanBoard({ board, staff, csrf, canManageUnits }: Props) {
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
+  const [orderedUnitKeys, setOrderedUnitKeys] = useState<string[]>(() => board.units.map((u) => u.key));
+  const [dragCard, setDragCard] = useState<{ caseId: string; fromUnit: string | null } | null>(null);
+  const [dragColumn, setDragColumn] = useState<string | null>(null);
+  const [dragOverUnit, setDragOverUnit] = useState<string | null>(null);
+  const [result, setResult] = useState<{ error?: string; message?: string }>({});
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
-  const columns = [...board.columns];
-  if (board.inbox.length) {
-    columns.push({ unitKey: "__inbox", unitName: "صندوق ورودی (بدون واحد)", unitDescription: null, cards: board.inbox });
+  // ترتیب موثر ستون‌ها (همیشه شامل همه واحدهای سرور، حتی اگر بعداً اضافه شده باشند)
+  const unitColumns = board.columns;
+  const effectiveOrder = orderedUnitKeys.filter((k) => unitColumns.some((c) => c.unitKey === k));
+  for (const c of unitColumns) if (!effectiveOrder.includes(c.unitKey)) effectiveOrder.push(c.unitKey);
+
+  const inboxCards = board.inbox;
+  const total = unitColumns.reduce((n, c) => n + c.cards.length, 0) + inboxCards.length;
+
+  function runCardDrop(e: React.DragEvent<HTMLDivElement>, targetUnit: string) {
+    e.preventDefault();
+    const columnKey = e.dataTransfer.getData("text/column");
+    if (columnKey) {
+      handleColumnDrop(columnKey, targetUnit);
+      setDragCard(null);
+      setDragColumn(null);
+      setDragOverUnit(null);
+      return;
+    }
+    const cardId = e.dataTransfer.getData("text/card");
+    setDragOverUnit(null);
+    if (!cardId) {
+      setDragCard(null);
+      return;
+    }
+    if (targetUnit === "__inbox") {
+      setDragCard(null);
+      return; // نمی‌توان به صندوق ورودی ارجاع داد
+    }
+    const fromUnit = e.dataTransfer.getData("text/from") || null;
+    if (fromUnit === targetUnit) {
+      setDragCard(null);
+      return; // رها کردن در همان ستون = بی‌اثر
+    }
+    const fd = new FormData();
+    fd.set("_csrf", csrf);
+    fd.set("caseId", cardId);
+    fd.set("kind", "unit");
+    fd.set("toUnit", targetUnit);
+    fd.set("reason", "جابه‌جایی کارت با درگ (ارجاع به واحد مقصد)");
+    startTransition(async () => {
+      const res = await referAction({}, fd);
+      setResult(res);
+      if (!res.error) router.refresh();
+    });
+    setDragCard(null);
   }
 
-  const total = columns.reduce((n, c) => n + c.cards.length, 0);
+  function handleColumnDrop(draggedKey: string, targetKey: string) {
+    if (draggedKey === targetKey) return;
+    const prev = effectiveOrder;
+    const from = prev.indexOf(draggedKey);
+    const to = prev.indexOf(targetKey);
+    if (from < 0 || to < 0) return;
+    const arr = [...prev];
+    arr.splice(from, 1);
+    arr.splice(to, 0, draggedKey);
+    setOrderedUnitKeys(arr);
+    const fd = new FormData();
+    fd.set("_csrf", csrf);
+    fd.set("order", arr.join(","));
+    startTransition(async () => {
+      const res = await reorderOrgUnitsAction({}, fd);
+      setResult(res);
+    });
+  }
 
   return (
     <div className="kanban">
       <div className="kanban-toolbar">
-        <span className="small muted">{total} کارت روی {columns.length} ستون</span>
+        <span className="small muted">{total} کارت روی {unitColumns.length + (inboxCards.length ? 1 : 0)} ستون</span>
+        <span className="small muted">کارت‌ها را بکشید بین ستون‌ها (ارجاع) و ستون‌ها را از سرستون بکشید (تغییر ترتیب)</span>
       </div>
 
+      {result.error ? <div className="alert error">{result.error}</div> : null}
+      {result.message ? <div className="alert success">{result.message}</div> : null}
+
       <div className="kanban-scroll">
-        {columns.map((col) => (
-          <div className="kanban-col" key={col.unitKey}>
+        {effectiveOrder.map((key) => {
+          const col = unitColumns.find((c) => c.unitKey === key);
+          if (!col) return null;
+          return (
+            <KanbanColumn
+              key={key}
+              column={col}
+              staff={staff}
+              csrf={csrf}
+              canManageUnits={canManageUnits}
+              isDragOver={dragOverUnit === key}
+              isDraggingCol={dragColumn === key}
+              onCardDragStart={(e, card) => {
+                e.dataTransfer.setData("text/card", card.caseId);
+                e.dataTransfer.setData("text/from", card.currentUnit ?? "");
+                e.dataTransfer.effectAllowed = "move";
+                setDragCard({ caseId: card.caseId, fromUnit: card.currentUnit });
+              }}
+              onColumnDragStart={(e, k) => {
+                e.dataTransfer.setData("text/column", k);
+                e.dataTransfer.effectAllowed = "move";
+                setDragColumn(k);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDragOverUnit(key);
+              }}
+              onDrop={(e) => runCardDrop(e, key)}
+              onDragEnd={() => {
+                setDragCard(null);
+                setDragColumn(null);
+                setDragOverUnit(null);
+              }}
+              onOpenCard={(card) => setActiveCard(card)}
+              draggingCardId={dragCard?.caseId ?? null}
+            />
+          );
+        })}
+
+        {inboxCards.length ? (
+          <div className="kanban-col">
             <div className="kanban-col-head">
-              <span className="kanban-col-name">{col.unitName}</span>
-              <span className="badge muted">{col.cards.length}</span>
+              <span className="kanban-col-name">صندوق ورودی (بدون واحد)</span>
+              <span className="badge muted">{inboxCards.length}</span>
             </div>
-            {col.unitDescription ? <div className="kanban-col-desc">{col.unitDescription}</div> : null}
             <div className="kanban-cards">
-              {col.cards.length === 0 ? (
-                <div className="kanban-empty">کارتی نیست</div>
-              ) : (
-                col.cards
-                  .slice()
-                  .sort((a, b) => STATUS_ORDER.indexOf(a.kanbanStatus as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(b.kanbanStatus as (typeof STATUS_ORDER)[number]))
-                  .map((card) => <KanbanCard key={card.caseId} card={card} onOpen={() => setActiveCard(card)} />)
-              )}
+              {inboxCards
+                .slice()
+                .sort(
+                  (a, b) =>
+                    STATUS_ORDER.indexOf(a.kanbanStatus as (typeof STATUS_ORDER)[number]) -
+                    STATUS_ORDER.indexOf(b.kanbanStatus as (typeof STATUS_ORDER)[number]),
+                )
+                .map((card) => (
+                  <KanbanCard
+                    key={card.caseId}
+                    card={card}
+                    onOpen={() => setActiveCard(card)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/card", card.caseId);
+                      e.dataTransfer.setData("text/from", card.currentUnit ?? "");
+                      e.dataTransfer.effectAllowed = "move";
+                      setDragCard({ caseId: card.caseId, fromUnit: card.currentUnit });
+                    }}
+                    onDragEnd={() => setDragCard(null)}
+                    dragging={false}
+                  />
+                ))}
             </div>
           </div>
-        ))}
+        ) : null}
       </div>
 
       {activeCard ? (
@@ -80,11 +203,98 @@ export function KanbanBoard({ board, staff, csrf }: Props) {
   );
 }
 
-function KanbanCard({ card, onOpen }: { card: BoardCard; onOpen: () => void }) {
+interface ColumnProps {
+  column: BoardColumn;
+  staff: StaffOption[];
+  csrf: string;
+  canManageUnits: boolean;
+  isDragOver: boolean;
+  isDraggingCol: boolean;
+  onCardDragStart: (e: React.DragEvent<HTMLDivElement>, card: BoardCard) => void;
+  onColumnDragStart: (e: React.DragEvent<HTMLDivElement>, key: string) => void;
+  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onOpenCard: (card: BoardCard) => void;
+  draggingCardId: string | null;
+}
+
+function KanbanColumn({
+  column,
+  staff,
+  csrf,
+  canManageUnits,
+  isDragOver,
+  isDraggingCol,
+  onCardDragStart,
+  onColumnDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onOpenCard,
+  draggingCardId,
+}: ColumnProps) {
+  return (
+    <div
+      className={`kanban-col${isDragOver ? " drag-over" : ""}${isDraggingCol ? " dragging-col" : ""}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
+      <div
+        className={`kanban-col-head${canManageUnits ? " col-draggable" : ""}`}
+        draggable={canManageUnits}
+        onDragStart={(e) => onColumnDragStart(e, column.unitKey)}
+      >
+        <span className="kanban-col-name">{column.unitName}</span>
+        <span className="badge muted">{column.cards.length}</span>
+      </div>
+      {column.unitDescription ? <div className="kanban-col-desc">{column.unitDescription}</div> : null}
+      <div className="kanban-cards">
+        {column.cards.length === 0 ? (
+          <div className="kanban-empty">کارتی نیست</div>
+        ) : (
+          column.cards
+            .slice()
+            .sort(
+              (a, b) =>
+                STATUS_ORDER.indexOf(a.kanbanStatus as (typeof STATUS_ORDER)[number]) -
+                STATUS_ORDER.indexOf(b.kanbanStatus as (typeof STATUS_ORDER)[number]),
+            )
+            .map((card) => (
+              <KanbanCard
+                key={card.caseId}
+                card={card}
+                onOpen={() => onOpenCard(card)}
+                onDragStart={(e) => onCardDragStart(e, card)}
+                onDragEnd={onDragEnd}
+                dragging={draggingCardId === card.caseId}
+              />
+            ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface CardProps {
+  card: BoardCard;
+  onOpen: () => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  dragging: boolean;
+}
+
+function KanbanCard({ card, onOpen, onDragStart, onDragEnd, dragging }: CardProps) {
   const tone = KANBAN_STATUS_TONE[card.kanbanStatus] ?? "muted";
   const last = card.referralPath[card.referralPath.length - 1];
   return (
-    <div className={`kard status-${card.kanbanStatus}`}>
+    <div
+      className={`kard status-${card.kanbanStatus}${dragging ? " dragging" : ""}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
       <div className="kard-top">
         <span className="badge info">{card.serviceName}</span>
         <span className={`badge ${tone}`}>{KANBAN_STATUS_LABELS[card.kanbanStatus] ?? card.kanbanStatus}</span>
