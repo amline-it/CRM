@@ -76,6 +76,28 @@ export function SessionBridge() {
   const pathname = usePathname();
   const running = useRef(false);
 
+  // پاک‌سازی سرویس‌ورکر نسخهٔ قدیمی (رویکرد پیشین که کنار گذاشته شد).
+  // اگر هنوز در مرورگر ثبت شده باشد، صفحات را کنترل می‌کند و می‌تواند جریان نشست را خراب کند.
+  useEffect(() => {
+    const container = (navigator as Navigator & { serviceWorker?: ServiceWorkerContainer }).serviceWorker;
+    if (!container?.getRegistrations) return;
+    container
+      .getRegistrations()
+      .then((registrations) => {
+        for (const registration of registrations) {
+          const script =
+            registration.active?.scriptURL ??
+            registration.waiting?.scriptURL ??
+            registration.installing?.scriptURL ??
+            "";
+          if (script.includes("session-worker")) void registration.unregister().catch(() => {});
+        }
+      })
+      .catch(() => {
+        /* دسترسی به serviceWorker ممکن نیست؛ نادیده */
+      });
+  }, []);
+
   useEffect(() => {
     const active = getSessionBridge();
     if (!active || running.current) return;
