@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SessionBridge } from "@/components/session-bridge";
 
 export const metadata: Metadata = {
   title: "CRM املاک",
@@ -14,7 +15,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fa" dir="rtl">
-      <body>{children}</body>
+      <body>
+        <SessionBridge />
+        {children}
+      </body>
     </html>
   );
 }

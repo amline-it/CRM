@@ -15,6 +15,8 @@ export interface LoginState {
   username?: string;
   /** توکن تازه CSRF که در صورت خطا به فرم برگردانده می‌شود تا کاربر مجبور به رفرش نباشد */
   csrf?: string;
+  /** توکن نشست برای مسیر بدون کوکی (مرورگر آن را در localStorage و سرویس‌ورکر نگه می‌دارد) */
+  ticket?: string;
 }
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
@@ -52,7 +54,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
         People.createSession({ staffId: staff.id, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() });
         const jar = await (await import("next/headers")).cookies();
         jar.set("crm_session", token, sessionCookieOptions(new Date(Date.now() + 12 * 3600_000)));
-        redirect("/panel");
+        return { ticket: token };
       }
     }
   }
@@ -65,7 +67,11 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     ip: headerList.get("x-forwarded-for") ?? null,
   });
   if (!result.ok) return { error: result.message, username };
-  redirect("/panel");
+  // توکن نشست به کلاینت برمی‌گردد تا در مسیر بدون کوکی هم کار کند؛
+  // سپس کلاینت خودش به پنل می‌رود (پس از آماده‌شدن سرویس‌ورکر).
+  const jar = await (await import("next/headers")).cookies();
+  const token = jar.get("crm_session")?.value;
+  return { ticket: token ?? undefined };
 }
 
 export async function logoutAction(): Promise<void> {

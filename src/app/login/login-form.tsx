@@ -1,14 +1,36 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { loginAction, bootstrapAdminAction, type LoginState } from "./actions";
+import { saveSessionTicket, syncTicketToWorker } from "@/components/session-bridge";
 
 const initialState: LoginState = {};
 
 export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
+  const router = useRouter();
+  const [entering, setEntering] = useState(false);
   // اگر اکشن توکن تازه برگرداند (مثلاً بعد از انقضا)، همان استفاده می‌شود
   const token = state.csrf ?? csrf;
+
+  // پس از ورود موفق: توکن نشست در مرورگر ذخیره و به سرویس‌ورکر داده می‌شود،
+  // سپس کاربر به پنل می‌رود. این مسیر مستقل از کوکی کار می‌کند.
+  useEffect(() => {
+    if (!state.ticket) return;
+    let active = true;
+    setEntering(true);
+    (async () => {
+      saveSessionTicket(state.ticket!);
+      await syncTicketToWorker(state.ticket!);
+      if (!active) return;
+      router.replace("/panel");
+      router.refresh();
+    })();
+    return () => {
+      active = false;
+    };
+  }, [state.ticket, router]);
   if (ssoToken) {
     return (
       <form action={formAction}>
@@ -37,8 +59,8 @@ export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string 
         <input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
       <input type="hidden" name="sso_token" value="" />
-      <button type="submit" style={{ width: "100%" }} disabled={pending}>
-        {pending ? "در حال ورود…" : "ورود به پنل"}
+      <button type="submit" style={{ width: "100%" }} disabled={pending || entering}>
+        {pending ? "در حال ورود…" : entering ? "ورود به پنل…" : "ورود به پنل"}
       </button>
     </form>
   );

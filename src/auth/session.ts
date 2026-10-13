@@ -2,7 +2,7 @@
  * جلسه کارمندان — سمت سرور (Next): کوکی HttpOnly + JWT + ردیف جلسه در دیتابیس.
  * ورود فقط برای کارشناس/مدیر؛ کاربران نهایی هرگز وارد پنل نمی‌شوند.
  */
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppError } from "@/lib/errors";
 import * as People from "@/db/repos/people";
@@ -11,6 +11,7 @@ import { assertCan, can, type Permission, type Role } from "@/auth/rbac";
 import { CSRF_FIELD, createCsrfToken, verifyCsrfToken } from "@/auth/csrf";
 import { verifyPassword } from "@/auth/password";
 import { signSessionToken, tokenHash, verifySessionToken } from "@/auth/jwt";
+import { headerSessionEnabled, ticketFromHeaders, SESSION_TICKET_HEADER, SESSION_AUTH_HEADER } from "@/auth/ticket";
 
 export const SESSION_COOKIE = "crm_session";
 
@@ -67,15 +68,22 @@ export async function login(input: LoginInput): Promise<{ ok: true; session: Cur
 
 export async function logout(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token = jar.get(SESSION_COOKIE)?.value ?? ((await headerListSafe())?.ticket ?? null);
   if (token) People.revokeSession(tokenHash(token));
   jar.delete(SESSION_COOKIE);
 }
 
-/** جلسه فعلی بدون ریدایرکت (برای صفحاتی که حالت مهمان هم دارند) */
-export async function getCurrentSession(): Promise<CurrentSession | null> {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+/** خواندن امن هدرها در اکشن‌ها (برای مسیر بدون کوکی) */
+async function headerListSafe(): Promise<{ ticket: string | null } | null> {
+  try {
+    return { ticket: ticketFromHeaders(await headers()) };
+  } catch {
+    return null;
+  }
+}
+
+/** اعتبارسنجی توکن جلسه (مشترک بین کوکی و هدر) */
+export async function sessionFromToken(token: string | null | undefined): Promise<CurrentSession | null> {
   if (!token) return null;
   const claims = await verifySessionToken(token);
   if (!claims) return null;
@@ -85,6 +93,19 @@ export async function getCurrentSession(): Promise<CurrentSession | null> {
   const staff = People.findStaffById(claims.sub);
   if (!staff || !staff.active) return null;
   return { staff, role: staff.role as Role, sessionId: session.id, expiresAt: session.expires_at };
+}
+
+/**
+ * جلسه فعلی بدون ریدایرکت (برای صفحاتی که حالت مهمان هم دارند).
+ * ابتدا کوکی، و اگر کوکی نبود/مسدود بود، توکن موجود در هدر.
+ */
+export async function getCurrentSession(): Promise<CurrentSession | null> {
+  const jar = await cookies();
+  const fromCookie = await sessionFromToken(jar.get(SESSION_COOKIE)?.value);
+  if (fromCookie) return fromCookie;
+  if (!headerSessionEnabled()) return null;
+  const headerList = await headers();
+  return sessionFromToken(ticketFromHeaders(headerList));
 }
 
 /** نیازمند ورود — در غیر این صورت به صفحه ورود هدایت می‌شود */
@@ -105,6 +126,8 @@ export async function requirePermission(permission: Permission): Promise<Current
 export function assertPermission(session: CurrentSession, permission: Permission): void {
   assertCan(session.role, permission);
 }
+
+export { headerSessionEnabled, ticketFromHeaders, SESSION_TICKET_HEADER, SESSION_AUTH_HEADER };
 
 /* ── CSRF ─────────────────────────────────────────────────────────── */
 

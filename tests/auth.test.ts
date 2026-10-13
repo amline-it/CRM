@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "@/auth/password";
 import { can, permissionsOf, assertCan } from "@/auth/rbac";
 import { signSessionToken, verifySessionToken, tokenHash } from "@/auth/jwt";
 import { createCsrfToken, safeEqual, verifyCsrfToken } from "@/auth/csrf";
+import { headerSessionEnabled, ticketFromHeaders } from "@/auth/ticket";
 
 process.env.SESSION_SECRET = "test-secret-at-least-32-chars-long!!";
 
@@ -107,5 +108,35 @@ describe("CSRF", () => {
     expect(verifyCsrfToken(null)).toEqual({ ok: false, reason: "missing" });
     expect(verifyCsrfToken("a.b")).toEqual({ ok: false, reason: "malformed" });
     expect(verifyCsrfToken("a.b.c.d")).toEqual({ ok: false, reason: "malformed" });
+  });
+});
+
+describe("توکن نشست از هدر (مسیر بدون کوکی)", () => {
+  const fakeHeaders = (map: Record<string, string>) => ({
+    get: (name: string) => map[name.toLowerCase()] ?? null,
+  });
+
+  it("هدر اختصاصی مقدم بر Authorization است", () => {
+    expect(ticketFromHeaders(fakeHeaders({ "x-session-ticket": "abc" }))).toBe("abc");
+    expect(ticketFromHeaders(fakeHeaders({ authorization: "Bearer xyz" }))).toBe("xyz");
+    expect(ticketFromHeaders(fakeHeaders({ "x-session-ticket": "abc", authorization: "Bearer xyz" }))).toBe("abc");
+  });
+
+  it("هدرهای نامعتبر/خالی توکن نمی‌دهند", () => {
+    expect(ticketFromHeaders(fakeHeaders({}))).toBeNull();
+    expect(ticketFromHeaders(fakeHeaders({ "x-session-ticket": "   " }))).toBeNull();
+    expect(ticketFromHeaders(fakeHeaders({ authorization: "Basic abc" }))).toBeNull();
+    expect(ticketFromHeaders(fakeHeaders({ authorization: "Bearer " }))).toBeNull();
+    expect(ticketFromHeaders(fakeHeaders({ authorization: "bearer low" }))).toBe("low");
+  });
+
+  it("با ALLOW_HEADER_SESSION=false این مسیر خاموش می‌شود", () => {
+    const previous = process.env.ALLOW_HEADER_SESSION;
+    process.env.ALLOW_HEADER_SESSION = "false";
+    expect(headerSessionEnabled()).toBe(false);
+    process.env.ALLOW_HEADER_SESSION = "true";
+    expect(headerSessionEnabled()).toBe(true);
+    if (previous === undefined) delete process.env.ALLOW_HEADER_SESSION;
+    else process.env.ALLOW_HEADER_SESSION = previous;
   });
 });

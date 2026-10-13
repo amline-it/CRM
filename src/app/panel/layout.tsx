@@ -6,7 +6,7 @@ import * as Cases from "@/db/repos/cases";
 import * as Catalog from "@/db/repos/catalog";
 import { STAFF_ROLE_LABELS } from "@/lib/fa-labels";
 import { faNumber } from "@/lib/money";
-import { logoutAction } from "../login/actions";
+import { LogoutButton } from "@/components/session-bridge";
 import { SideNav, type NavGroup } from "./nav";
 
 export const dynamic = "force-dynamic";
@@ -73,11 +73,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <span>
               {session.staff.full_name} · {STAFF_ROLE_LABELS[session.staff.role] ?? session.staff.role}
             </span>
-            <form action={logoutAction} className="inline-form">
-              <button type="submit" className="secondary small">
-                خروج
-              </button>
-            </form>
+            <LogoutButton />
           </div>
         </header>
         <main className="content">{children}</main>
