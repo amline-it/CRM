@@ -103,6 +103,25 @@ for (const service of services) {
 }
 console.log(`[seed] خدمات ساخته‌شده: ${serviceCount} (از ${services.length})`);
 
+/* ── ۳.۵) واحدهای سازمانی (ستون‌های کانبان ارجاع) ──────────────────── */
+const ORG_UNITS = [
+  { key: "reception", name: "واحد پذیرش", description: "دریافت و ثبت اولیه خدمات", sort_order: 1 },
+  { key: "legal", name: "واحد حقوقی", description: "بررسی حقوقی و قراردادها", sort_order: 2 },
+  { key: "finance", name: "واحد مالی", description: "پرداخت، فاکتور و تسویه", sort_order: 3 },
+  { key: "registration", name: "واحد ثبت", description: "ثبت و تطبیق پرونده‌ها", sort_order: 4 },
+  { key: "marketing", name: "واحد بازاریابی", description: "انتشار آگهی و معرفی", sort_order: 5 },
+];
+let orgUnitCount = 0;
+for (const unit of ORG_UNITS) {
+  const existing = db.prepare("SELECT id FROM org_units WHERE key = ?").get(unit.key);
+  if (existing) continue;
+  db.prepare(
+    "INSERT INTO org_units (id, key, name, description, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(id("org"), unit.key, unit.name, unit.description ?? null, unit.sort_order ?? 0, nowIso(), nowIso());
+  orgUnitCount += 1;
+}
+if (orgUnitCount) console.log(`[seed] واحدهای سازمانی ساخته شد: ${orgUnitCount}`);
+
 /* ── ۴) کارشناس نمونه (اختیاری) ───────────────────────────────────── */
 if (staffArgIndex !== -1) {
   const spec = process.argv[staffArgIndex + 1] ?? "admin:Admin@1234:مدیر سامانه";
@@ -464,6 +483,83 @@ function seedDemo() {
     );
     console.log(`[seed] وظیفه نمونه برای ${staffName} ساخته شد`);
   }
+
+  seedKanbanDemo();
+}
+
+/* ── داده نمونه کانبان ارجاع (واحدها، کارشناسان و پرونده‌های ارجاعی) ── */
+function seedKanbanDemo() {
+  const staffSpec = [
+    { u: "reception1", n: "کارشناس پذیرش", unit: "reception", title: "کارشناس پذیرش" },
+    { u: "legal1", n: "کارشناس حقوقی", unit: "legal", title: "کارشناس حقوقی" },
+    { u: "finance1", n: "کارشناس مالی", unit: "finance", title: "کارشناس مالی" },
+    { u: "reg1", n: "کارشناس ثبت", unit: "registration", title: "کارشناس ثبت" },
+    { u: "mkt1", n: "کارشناس بازاریابی", unit: "marketing", title: "کارشناس بازاریابی" },
+  ];
+  const staffIds = {};
+  const unitToStaff = {};
+  for (const s of staffSpec) {
+    let row = db.prepare("SELECT id FROM staff WHERE username = ?").get(s.u);
+    if (!row) {
+      const sid = id("stf");
+      db.prepare(
+        "INSERT INTO staff (id, username, password_hash, full_name, role, active, org_unit, title, created_at, updated_at) VALUES (?, ?, ?, ?, 'staff', 1, ?, ?, ?, ?)",
+      ).run(sid, s.u, legacyHash("Demo@1234"), s.n, s.unit, s.title, nowIso(), nowIso());
+      row = { id: sid };
+    }
+    staffIds[s.u] = row.id;
+    unitToStaff[s.unit] = row.id;
+  }
+
+  const insertCase = db.prepare(
+    `INSERT INTO cases (id, code, external_id, source, title, service_key, workflow_key, workflow_version, state, status, priority,
+       owner_user_id, agent_user_id, assigned_staff_id, due_at, requires_tracking, access_level, attempts_payment, attempts_tracking, meta,
+       opened_at, last_transition_at, created_at, updated_at, kanban_status)
+     VALUES (?, NULL, NULL, 'kanban-demo', ?, 'custom', 'custom_service', 1, 'service_start', 'open', 'normal',
+       NULL, NULL, ?, NULL, 0, NULL, 0, 0, '{}', ?, ?, ?, ?, ?)`,
+  );
+  const insertRef = db.prepare(
+    `INSERT INTO referrals (id, case_id, from_staff_id, from_unit, to_staff_id, to_unit, kind, reason, service_key, service_name, depth, at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'custom', ?, ?, ?, ?)`,
+  );
+  const insertTimeline = db.prepare(
+    `INSERT INTO timeline_events (id, case_id, kind, title, body, visibility, actor_id, actor_name, at, meta)
+     VALUES (?, ?, 'referral.sent', ?, ?, 'internal', ?, 'کانبان', ?, '{}')`,
+  );
+
+  const samples = [
+    {
+      title: "قرارداد اجاره واحد ۱۲",
+      hops: [{ fromUnit: "reception", toUnit: "legal", toStaff: "legal1", kind: "unit", reason: "بررسی حقوقی قرارداد", status: "in_review" }],
+    },
+    {
+      title: "آگهی فروش ویلای شمال",
+      hops: [{ fromUnit: "reception", toUnit: "marketing", toStaff: null, kind: "unit", reason: "انتشار در پایگاه آگهی", status: "waiting_info" }],
+    },
+    {
+      title: "درخواست تطبیق نیازمندی",
+      hops: [
+        { fromUnit: "reception", toUnit: "registration", toStaff: "reg1", kind: "unit", reason: "ثبت درخواست", status: "new" },
+        { fromUnit: "registration", toUnit: "finance", toStaff: "finance1", kind: "unit", reason: "بررسی پرداخت و تسویه", status: "in_review" },
+      ],
+    },
+  ];
+
+  for (const sample of samples) {
+    const caseId = id("case");
+    const lastHop = sample.hops[sample.hops.length - 1];
+    const assignedId = lastHop.toStaff ? staffIds[lastHop.toStaff] : null;
+    insertCase.run(caseId, sample.title, assignedId, nowIso(), nowIso(), nowIso(), nowIso(), lastHop.status);
+    let depth = 0;
+    for (const hop of sample.hops) {
+      depth += 1;
+      const fromStaffId = unitToStaff[hop.fromUnit] ?? null;
+      const toStaffId = hop.toStaff ? staffIds[hop.toStaff] : null;
+      insertRef.run(id("ref"), caseId, fromStaffId, hop.fromUnit, toStaffId, hop.toUnit, hop.kind, hop.reason, sample.title, nowIso(), nowIso(), depth);
+      insertTimeline.run(id("tle"), caseId, `ارجاع به واحد ${hop.toUnit}`, hop.reason, fromStaffId, nowIso());
+    }
+  }
+  console.log("[seed] کانبان ارجاع: نمونه کارشناسان و پرونده‌های ارجاعی ساخته شد");
 }
 
 /** hash سازگار با scrypt در src/auth/password.ts (فرمت scrypt$N$r$p$salt$hash) */

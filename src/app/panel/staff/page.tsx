@@ -2,6 +2,7 @@ import { requireSession, getCsrfToken } from "@/auth/session";
 import { can } from "@/auth/rbac";
 import * as People from "@/db/repos/people";
 import * as Cases from "@/db/repos/cases";
+import * as Referrals from "@/db/repos/referrals";
 import { toJalaliDateTime, relativeFa } from "@/lib/jalali";
 import { faNumber } from "@/lib/money";
 import { STAFF_ROLE_LABELS, labelOf } from "@/lib/fa-labels";
@@ -15,6 +16,8 @@ export default async function StaffPage() {
   const csrf = await getCsrfToken();
   const staff = People.listStaff();
   const isAdmin = can(session.role, "staff.manage");
+  const units = Referrals.listOrgUnits();
+  const unitOptions = units.map((u) => ({ value: u.key, label: u.name }));
   const openTasks = Cases.listTasks({ status: ["open", "in_progress"], limit: 500 });
 
   const load = new Map<string, number>();
@@ -58,6 +61,8 @@ export default async function StaffPage() {
                 <th>نام</th>
                 <th>نام کاربری</th>
                 <th>نقش</th>
+                <th>واحد سازمانی</th>
+                <th>عنوان</th>
                 <th>وضعیت</th>
                 <th>بار کاری</th>
                 <th>آخرین ورود</th>
@@ -65,13 +70,17 @@ export default async function StaffPage() {
               </tr>
             </thead>
             <tbody>
-              {staff.map((member) => (
+              {staff.map((member) => {
+                const unit = member.org_unit ? units.find((u) => u.key === member.org_unit) : null;
+                return (
                 <tr key={member.id}>
                   <td>{member.full_name}</td>
                   <td className="mono small">{member.username}</td>
                   <td>
                     <span className={`badge ${member.role === "admin" ? "info" : "muted"}`}>{labelOf(STAFF_ROLE_LABELS, member.role)}</span>
                   </td>
+                  <td>{unit ? <span className="badge muted">{unit.name}</span> : <span className="small muted">—</span>}</td>
+                  <td className="small">{member.title ?? "—"}</td>
                   <td>
                     <span className={`badge ${member.active ? "success" : "danger"}`}>{member.active ? "فعال" : "غیرفعال"}</span>
                   </td>
@@ -79,7 +88,8 @@ export default async function StaffPage() {
                   <td className="small">{member.last_login_at ? relativeFa(member.last_login_at) : "—"}</td>
                   <td className="small mono">{member.sso_subject ?? "—"}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -117,6 +127,8 @@ export default async function StaffPage() {
                         { value: "false", label: "غیرفعال" },
                       ]}
                     />
+                    <Field label="واحد سازمانی" name="orgUnit" type="select" defaultValue={member.org_unit ?? ""} options={unitOptions} emptyLabel="بدون واحد" />
+                    <Field label="عنوان شغلی" name="title" defaultValue={member.title ?? ""} placeholder="مثلاً کارشناس حقوقی" />
                   </div>
                 </ActionForm>
 
@@ -153,6 +165,8 @@ export default async function StaffPage() {
                     { value: "admin", label: "مدیر" },
                   ]}
                 />
+                <Field label="واحد سازمانی" name="orgUnit" type="select" options={unitOptions} emptyLabel="بدون واحد" />
+                <Field label="عنوان شغلی" name="title" placeholder="مثلاً کارشناس حقوقی" />
                 <Field label="رمز عبور" name="password" type="password" required hint="حداقل ۶ کاراکتر" />
               </div>
             </ActionForm>

@@ -22,6 +22,7 @@ export interface CaseRow {
   owner_user_id: string | null;
   agent_user_id: string | null;
   assigned_staff_id: string | null;
+  kanban_status: string;
   due_at: string | null;
   requires_tracking: number;
   access_level: string | null;
@@ -175,7 +176,7 @@ export function updateCase(id: string, patch: Record<string, unknown>): void {
   const allowed = [
     "code", "external_id", "source", "title", "service_key", "workflow_key", "workflow_version", "state", "status",
     "outcome", "priority", "owner_user_id", "agent_user_id", "assigned_staff_id", "due_at", "requires_tracking",
-    "access_level", "queue", "attempts_payment", "attempts_tracking", "meta", "closed_at", "last_transition_at",
+    "access_level", "queue", "attempts_payment", "attempts_tracking", "meta", "closed_at", "last_transition_at", "kanban_status",
   ];
   const keys = Object.keys(patch).filter((k) => allowed.includes(k));
   if (!keys.length) return;
