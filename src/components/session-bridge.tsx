@@ -4,41 +4,26 @@
  * پل نشست سمت React:
  *  - وصله‌کردن fetch/تاریخ مرورگر با توکن نشست (بدون نیاز به کوکی یا سرویس‌ورکر)
  *  - اگر کاربر با توکن معتبر به صفحه ورود برگشت، خودکار به پنل برمی‌گردد
+ *  - اگر کوکی نشست واقعاً کار می‌کند، توکن از آدرس پاک می‌شود (آدرس تمیز) ولی در
+ *    حافظه می‌ماند تا در صورت پاک‌شدن کوکی، نشست خودکار بازیابی شود
  *  - دکمه خروج که هم نشست سرور و هم توکن مرورگر را پاک می‌کند
  */
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createSessionBridge,
-  ticketFromUrl,
-  TICKET_STORAGE_KEY,
+  createWindowScope,
+  TICKET_QUERY,
   type SessionBridge,
-  type BridgeScope,
+  type WindowLike,
 } from "./session-bridge-core";
 
 let bridge: SessionBridge | null = null;
 
-function browserScope(): BridgeScope | null {
+/** پنجرهٔ واقعی مرورگر به‌صورت زنده (وصله‌کردن روی window اثر می‌گذارد) */
+function browserScope() {
   if (typeof window === "undefined") return null;
-  let storage: Storage | null = null;
-  try {
-    storage = window.localStorage;
-    // آزمایش دسترسی: در iframe با origin نامعتبر، دسترسی پرتاب خطا می‌کند
-    storage.getItem(TICKET_STORAGE_KEY);
-  } catch {
-    storage = null;
-  }
-  return {
-    fetch: window.fetch.bind(window),
-    location: {
-      href: window.location.href,
-      origin: window.location.origin,
-      assign: (url: string) => window.location.assign(url),
-      replace: (url: string) => window.location.replace(url),
-    },
-    history: window.history,
-    storage,
-  };
+  return createWindowScope(window as unknown as WindowLike);
 }
 
 /** پل نشست مشترک در کل تب (تنبل ساخته می‌شود) */
@@ -48,6 +33,16 @@ export function getSessionBridge(): SessionBridge | null {
   if (!scope) return null;
   bridge = createSessionBridge(scope);
   return bridge;
+}
+
+/** خواندن توکن از نوار آدرس */
+function ticketInAddressBar(): string | null {
+  try {
+    const value = new URLSearchParams(window.location.search).get(TICKET_QUERY);
+    return value && value.trim() ? value.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** خواندن توکن: آدرس → حافظه → ذخیره‌سازی */
@@ -64,19 +59,15 @@ export function clearSessionTicket(): void {
   getSessionBridge()?.deactivate();
 }
 
-/**
- * بررسی اینکه کوکی نشست واقعاً کار می‌کند یا نه (بدون هدر توکن).
- * اگر پاسخ ۲۰۰ باشد یعنی مرورگر کوکی را می‌فرستد و نیازی به مسیر جایگزین نیست.
- */
-export async function cookiesWork(): Promise<boolean> {
-  const active = getSessionBridge();
+/** پاک‌کردن پارامتر توکن از نوار آدرس (بدون افزودن دوباره) */
+function stripTicketFromAddressBar(): void {
   try {
-    const request = (url: string, init?: RequestInit) =>
-      active ? active.fetchWithoutTicket(url, init) : fetch(url, init);
-    const response = await request("/api/auth/session", { credentials: "include", cache: "no-store" });
-    return response.ok;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(TICKET_QUERY)) return;
+    url.searchParams.delete(TICKET_QUERY);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   } catch {
-    return false;
+    /* نادیده */
   }
 }
 
@@ -89,48 +80,56 @@ export function SessionBridge() {
     const active = getSessionBridge();
     if (!active || running.current) return;
 
-    const fromUrl = ticketFromUrl({ ...(browserScope() as BridgeScope) });
-    const ticket = fromUrl ?? active.ticketFromStorage();
+    const ticket = ticketInAddressBar() ?? active.ticketFromStorage();
     if (!ticket) return;
 
     running.current = true;
-    // توکن موجود = حالت بدون کوکی فعال شود (fetch و آدرس هر دو)
+    // پیش‌فرض محافظه‌کارانه: توکن هم در آدرس بماند تا رفرش/بارگذاری مستقیم نشست را از دست ندهد
     active.activate(ticket, { keepInUrl: true });
 
     const onGuestPage = pathname === "/login" || pathname === "/";
-    if (!onGuestPage) {
-      running.current = false;
-      return;
-    }
 
     (async () => {
-      let valid = false;
-      try {
-        const response = await active.fetchWithoutTicket("/api/auth/session", {
-          headers: { "x-session-ticket": ticket },
-          cache: "no-store",
-        });
-        valid = response.ok;
-      } catch {
-        valid = false;
-      }
+      const probe = async (withTicket: boolean): Promise<boolean> => {
+        try {
+          const response = await active.fetchWithoutTicket("/api/auth/session", {
+            headers: withTicket ? { "x-session-ticket": ticket } : undefined,
+            credentials: "include",
+            cache: "no-store",
+          });
+          return response.ok;
+        } catch {
+          return false;
+        }
+      };
 
-      if (valid) {
-        // ناوبری کامل (نه SPA) تا توکن در درخواست سند هم حضور داشته باشد
-        const target = active.decorateUrl("/panel");
-        window.location.assign(target);
+      const [ticketValid, cookiesOk] = await Promise.all([probe(true), probe(false)]);
+
+      if (onGuestPage) {
+        if (ticketValid) {
+          // ناوبری کامل (نه SPA) تا توکن در درخواست سند هم حضور داشته باشد
+          running.current = false;
+          window.location.assign(active.decorateUrl("/panel"));
+          return;
+        }
+        // توکن باطل/منقضی: پاک‌سازی تا کاربر با فرم ورود ادامه دهد
+        active.deactivate();
+        stripTicketFromAddressBar();
+        router.refresh();
         return;
       }
-      // توکن باطل/منقضی: پاک‌سازی تا کاربر با فرم ورود ادامه دهد
-      active.deactivate();
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("t");
-        window.history.replaceState(window.history.state, "", url.pathname + url.search);
-      } catch {
-        /* نادیده */
+
+      // داخل پنل: اگر کوکی نشست کار می‌کند، آدرس را تمیز می‌کنیم
+      // (توکن در حافظه و ذخیره‌سازی می‌ماند؛ پس اگر کوکی بعداً از بین برود،
+      //  کاربر در صفحه ورود خودکار به پنل برمی‌گردد)
+      if (cookiesOk) {
+        active.activate(ticket, { keepInUrl: false });
+        stripTicketFromAddressBar();
+      } else if (!ticketValid) {
+        active.deactivate();
+        stripTicketFromAddressBar();
+        window.location.assign("/login");
       }
-      router.refresh();
     })().finally(() => {
       running.current = false;
     });

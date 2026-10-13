@@ -48,6 +48,7 @@ docker compose up -d --build
 | `npm run build` / `npm start` | ساخت و اجرای نسخه تولیدی |
 | `npm test` | آزمون‌های واحد و سناریو (Vitest) |
 | `npm run e2e` | آزمون سرتاسری روی سرور در حال اجرا (سینک + وب‌هوک) |
+| `npm run test:browser` | شبیه‌سازی مسیر کامل کاربر در مرورگر (ورود، پنل، رفرش) روی سرور در حال اجرا |
 | `npm run migrate` | اعمال مهاجرت‌های SQL (`-- --status` برای مشاهده وضعیت) |
 | `npm run seed` | ثبت تعریف‌های گردش‌کار، خدمات و (با `--demo`) داده نمونه |
 | `npm run lint` | بررسی نوع‌ها با TypeScript |

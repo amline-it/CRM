@@ -1,44 +1,28 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { loginAction, bootstrapAdminAction, type LoginState } from "./actions";
-import { cookiesWork, getSessionBridge, saveSessionTicket } from "@/components/session-bridge";
+import { getSessionBridge, saveSessionTicket } from "@/components/session-bridge";
 
 const initialState: LoginState = {};
 
 export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
-  const router = useRouter();
   const [entering, setEntering] = useState(false);
   // اگر اکشن توکن تازه برگرداند (مثلاً بعد از انقضا)، همان استفاده می‌شود
   const token = state.csrf ?? csrf;
 
-  // پس از ورود موفق:
-  //  ۱) اگر مرورگر کوکی نشست را نگه می‌دارد (حالت عادی روی سرور شما) → ناوبری معمولی
-  //  ۲) اگر کوکی مسدود است (iframe/مرورگر سخت‌گیر) → مسیر جایگزین بدون کوکی فعال می‌شود:
-  //     توکن در حافظه صفحه + آدرس، و درخواست‌ها با هدر امضاشده می‌روند.
+  // پس از ورود موفق، همیشه با «توکن در آدرس» به پنل می‌رویم:
+  //  - اگر مرورگر کوکی را نگه دارد، خود پنل توکن را از آدرس پاک می‌کند (آدرس تمیز).
+  //  - اگر کوکی مسدود باشد (iframe/مرورگر سخت‌گیر)، همین توکن نشست را حفظ می‌کند.
+  // ناوبری کامل صفحه است (نه SPA) تا توکن در همان درخواست سند حضور داشته باشد.
   useEffect(() => {
     if (!state.ticket) return;
-    const ticket = state.ticket;
-    let active = true;
     setEntering(true);
-    (async () => {
-      const cookieAvailable = await cookiesWork();
-      if (!active) return;
-      if (cookieAvailable) {
-        router.replace("/panel");
-        router.refresh();
-        return;
-      }
-      saveSessionTicket(ticket, true);
-      const target = getSessionBridge()?.decorateUrl("/panel") ?? "/panel";
-      window.location.assign(target);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [state.ticket, router]);
+    saveSessionTicket(state.ticket, true);
+    const target = getSessionBridge()?.decorateUrl("/panel") ?? "/panel";
+    window.location.assign(target);
+  }, [state.ticket]);
   if (ssoToken) {
     return (
       <form action={formAction}>

@@ -34,6 +34,59 @@ export interface BridgeScope {
   };
   /** ممکن است وجود نداشته باشد یا پرتاب خطا کند (iframe با origin نامعتبر) */
   storage?: BridgeStorage | null;
+  /**
+   * شیئی که تابع اصلی fetch باید با آن فراخوانی شود (در مرورگر: window).
+   * در مرورگرها `fetch` بدون this معتبر پرتاب خطا می‌کند، پس لازم است.
+   */
+  fetchHost?: unknown;
+}
+
+/** حداقل چیزی که از window لازم داریم (تا در آزمون‌ها با پنجره جعلی قابل استفاده باشد) */
+export interface WindowLike {
+  fetch: typeof globalThis.fetch;
+  location: { href: string; origin?: string; assign(url: string): void; replace(url: string): void };
+  history: BridgeScope["history"];
+  localStorage?: BridgeStorage | null;
+}
+
+/**
+ * ساخت BridgeScope از یک پنجره واقعی (window).
+ *
+ * نکته حیاتی: خواص fetch و history «زنده» هستند — نوشتن روی scope.fetch دقیقاً
+ * window.fetch را عوض می‌کند. اگر به‌جای این، یک نسخهٔ bindشده در یک شیء محلی
+ * گذاشته شود، وصله‌کردن بی‌اثر می‌شود و درخواست‌های روتر Next (که مستقیماً
+ * fetch سراسری را صدا می‌زند) بدون هدر توکن می‌روند و کاربر به صفحه ورود برمی‌گردد.
+ */
+export function createWindowScope(win: WindowLike): BridgeScope {
+  let storage: BridgeStorage | null = null;
+  try {
+    const candidate = win.localStorage ?? null;
+    if (candidate) {
+      // آزمایش دسترسی: در iframe با origin نامعتبر، دسترسی پرتاب خطا می‌کند
+      candidate.getItem(TICKET_STORAGE_KEY);
+      storage = candidate;
+    }
+  } catch {
+    storage = null;
+  }
+
+  return {
+    get fetch() {
+      return win.fetch;
+    },
+    set fetch(value: typeof globalThis.fetch) {
+      win.fetch = value;
+    },
+    get history() {
+      return win.history;
+    },
+    set history(value: BridgeScope["history"]) {
+      win.history = value;
+    },
+    fetchHost: win,
+    location: win.location,
+    storage,
+  };
 }
 
 export interface ActivateOptions {
@@ -97,7 +150,9 @@ export function createSessionBridge(scope: BridgeScope): SessionBridge {
   let installed = false;
 
   const originalFetch = scope.fetch;
-  const callFetch = originalFetch.bind(scope);
+  // فراخوانی با this درست (window در مرورگر) تا خطای Illegal invocation رخ ندهد
+  const callFetch = (input: RequestInfo | URL, init?: RequestInit) =>
+    originalFetch.call(scope.fetchHost ?? scope, input, init);
   const originalPushState = scope.history.pushState;
   const originalReplaceState = scope.history.replaceState;
 

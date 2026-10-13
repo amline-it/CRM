@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   createSessionBridge,
+  createWindowScope,
   decorateUrlWithTicket,
   ticketFromUrl,
   TICKET_STORAGE_KEY,
@@ -213,5 +214,132 @@ describe("پل نشست — ذخیره‌سازی و حالت‌های سخت", 
     await scope.fetch("/panel");
     expect(calls).toHaveLength(1);
     expect(calls[0].headers["x-session-ticket"]).toBe("token-two");
+  });
+});
+
+/**
+ * رگرسیون مهم: وصله باید روی window.fetch «واقعی» بنشیند.
+ * روتر Next مستقیماً fetch سراسری را صدا می‌زند؛ اگر وصله در یک نسخهٔ bindشدهٔ
+ * محلی گم شود، همه ناوبری‌ها بدون توکن می‌روند و کاربر به صفحه ورود پرت می‌شود.
+ */
+describe("پل نشست — وصله روی window واقعی", () => {
+  interface Call {
+    url: string;
+    headers: Record<string, string>;
+  }
+
+  function makeWindow(options: { href?: string; storageThrows?: boolean; requiresThis?: boolean } = {}) {
+    const href = options.href ?? "https://crm.example.com/panel?t=tok-123";
+    const calls: Call[] = [];
+    const assignLog: string[] = [];
+    const store = new Map<string, string>();
+    const historyCalls: Array<{ kind: string; url: string | undefined }> = [];
+
+    // تابع اصلی: اگر this درست نباشد خطا می‌دهد (رفتار واقعی fetch مرورگر)
+    function nativeFetch(this: unknown, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      if (options.requiresThis && this !== win) throw new TypeError("Illegal invocation");
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
+      const headers: Record<string, string> = {};
+      const source =
+        init?.headers ?? (typeof input === "object" && input !== null && "headers" in input ? (input as Request).headers : undefined);
+      if (source) new Headers(source as HeadersInit).forEach((value, key) => (headers[key] = value));
+      calls.push({ url, headers });
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+
+    const win = {
+      fetch: nativeFetch as unknown as typeof globalThis.fetch,
+      location: {
+        href,
+        origin: new URL(href).origin,
+        assign: (url: string) => assignLog.push(`assign:${url}`),
+        replace: (url: string) => assignLog.push(`replace:${url}`),
+      },
+      history: {
+        pushState(_data: unknown, _title: string, url?: string | URL | null) {
+          historyCalls.push({ kind: "push", url: url === undefined || url === null ? undefined : String(url) });
+        },
+        replaceState(_data: unknown, _title: string, url?: string | URL | null) {
+          historyCalls.push({ kind: "replace", url: url === undefined || url === null ? undefined : String(url) });
+        },
+      },
+      localStorage: options.storageThrows
+        ? ({
+            getItem() {
+              throw new Error("SecurityError");
+            },
+            setItem() {
+              throw new Error("SecurityError");
+            },
+            removeItem() {
+              throw new Error("SecurityError");
+            },
+          } as unknown as Storage)
+        : ({
+            getItem: (key: string) => store.get(key) ?? null,
+            setItem: (key: string, value: string) => void store.set(key, value),
+            removeItem: (key: string) => void store.delete(key),
+          } as unknown as Storage),
+    };
+    return { win, calls, assignLog, historyCalls, store, nativeFetch };
+  }
+
+  it("روتر Next که window.fetch را صدا می‌زند، هدر توکن می‌گیرد", async () => {
+    const { win, calls } = makeWindow({ href: "https://crm.example.com/panel?t=tok-123" });
+    const bridge = createSessionBridge(createWindowScope(win));
+    bridge.activate("tok-123", { keepInUrl: true });
+
+    // این همان کاری است که روتر Next برای ناوبری RSC انجام می‌دهد
+    await win.fetch("https://crm.example.com/panel/cases");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].headers["x-session-ticket"]).toBe("tok-123");
+  });
+
+  it("دامنه دیگر و درخواست بدون توکن هدر نمی‌گیرند", async () => {
+    const { win, calls } = makeWindow();
+    const bridge = createSessionBridge(createWindowScope(win));
+    bridge.activate("tok-123", { keepInUrl: true });
+
+    await win.fetch("https://other.example.com/api");
+    await bridge.fetchWithoutTicket("https://crm.example.com/api/auth/session");
+    expect(calls[0].headers["x-session-ticket"]).toBeUndefined();
+    expect(calls[1].headers["x-session-ticket"]).toBeUndefined();
+  });
+
+  it("fetch اصلی با this درست صدا زده می‌شود (بدون Illegal invocation)", async () => {
+    const { win, calls } = makeWindow({ requiresThis: true });
+    const bridge = createSessionBridge(createWindowScope(win));
+    bridge.activate("tok-123", { keepInUrl: true });
+
+    await win.fetch("/panel/tasks"); // اگر this اشتباه باشد پرتاب خطا می‌کند
+    await bridge.fetchWithoutTicket("/api/auth/session");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("پس از خاموش‌کردن، همان تابع اصلی روی window برمی‌گردد", () => {
+    const { win, nativeFetch } = makeWindow();
+    const bridge = createSessionBridge(createWindowScope(win));
+    bridge.activate("tok-123", { keepInUrl: true });
+    expect(win.fetch).not.toBe(nativeFetch);
+    bridge.deactivate();
+    expect(win.fetch).toBe(nativeFetch);
+  });
+
+  it("ذخیره‌سازی مسدود، مانع فعال‌شدن نمی‌شود", async () => {
+    const { win, calls } = makeWindow({ storageThrows: true });
+    const scope = createWindowScope(win);
+    expect(scope.storage).toBeNull();
+    const bridge = createSessionBridge(scope);
+    bridge.activate("tok-123", { keepInUrl: true });
+    await win.fetch("/panel");
+    expect(calls[0].headers["x-session-ticket"]).toBe("tok-123");
+  });
+
+  it("نگه‌داشتن توکن در آدرس، آدرس‌های هم‌دامنه را با ?t همراه می‌کند", () => {
+    const { win, historyCalls } = makeWindow();
+    const bridge = createSessionBridge(createWindowScope(win));
+    bridge.activate("tok-123", { keepInUrl: true });
+    win.history.pushState({}, "", "/panel/cases");
+    expect(historyCalls.some((call) => call.url?.includes("t=tok-123"))).toBe(true);
   });
 });
