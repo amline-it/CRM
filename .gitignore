@@ -7,8 +7,8 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
-# داده و محیط
-data/
+# داده و محیط (فقط پوشه داده ریشه؛ src/data شامل داده اولیه برنامه است و نادیده گرفته نمی‌شود)
+/data/
 .env
 .env.local
 .env.*.local

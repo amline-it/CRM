@@ -4,6 +4,8 @@ import { can } from "@/auth/rbac";
 import { ensureMigrated } from "@/db/migrate";
 import * as Cases from "@/db/repos/cases";
 import * as Catalog from "@/db/repos/catalog";
+import * as Platform from "@/db/repos/platform";
+import { NotificationBell } from "@/components/ops/notification-bell";
 import { STAFF_ROLE_LABELS } from "@/lib/fa-labels";
 import { faNumber } from "@/lib/money";
 import { LogoutButton } from "@/components/session-bridge";
@@ -23,6 +25,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const openTasks = Cases.countOpenTasks();
   const listingsInReview = Catalog.listListings({ status: "pending_review", limit: 100 }).length;
   const requirementsOpen = Catalog.listRequirements({ status: "open", limit: 100 }).length;
+  const unreadInbox = Platform.countUnreadInbox(session.staff.id);
 
   const groups: NavGroup[] = [
     {
@@ -43,8 +46,11 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       ],
     },
     {
-      title: "کانبان ارجاع",
-      items: [{ href: "/panel/kanban", label: "تخته ارجاع درون‌سازمانی" }],
+      title: "عملیات و هماهنگی",
+      items: [
+        { href: "/panel/kanban", label: "کانبان عملیات" },
+        { href: "/panel/inbox", label: "صندوق اعلان", badge: unreadInbox },
+      ],
     },
     {
       title: "مدیریت",
@@ -76,6 +82,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         <header className="topbar">
           <div className="title">پنل کارشناسان و مدیران</div>
           <div className="user">
+            <NotificationBell initialUnread={unreadInbox} />
             <span className="badge muted">{faNumber(openCases)} پرونده باز</span>
             <span>
               {session.staff.full_name} · {STAFF_ROLE_LABELS[session.staff.role] ?? session.staff.role}

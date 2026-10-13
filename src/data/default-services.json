@@ -1,0 +1,62 @@
+[
+  {
+    "key": "contract",
+    "name": "تنظیم قرارداد",
+    "category": "contract",
+    "workflowKey": "contract",
+    "price": 500000,
+    "requiresSubscription": false,
+    "requiresReferral": false,
+    "requiredDocuments": ["ownership", "national_id"],
+    "sortOrder": 1,
+    "description": "تنظیم قرارداد اجاره یا خرید و فروش ملک: اطلاعات طرفین، بررسی مالی، مدارک، بررسی حقوقی، امضا و کد رهگیری."
+  },
+  {
+    "key": "listing",
+    "name": "ثبت آگهی",
+    "category": "listing",
+    "workflowKey": "listing",
+    "price": 200000,
+    "requiresSubscription": false,
+    "requiresReferral": false,
+    "requiredDocuments": ["ownership"],
+    "sortOrder": 2,
+    "description": "ثبت و انتشار آگهی ملک: بررسی شرایط مالی، تکمیل اطلاعات و تصاویر، بررسی کارشناس و انتشار."
+  },
+  {
+    "key": "requirements",
+    "name": "درخواست نیازمندی",
+    "category": "requirements",
+    "workflowKey": "requirements",
+    "price": 0,
+    "requiresSubscription": false,
+    "requiresReferral": false,
+    "requiredDocuments": [],
+    "sortOrder": 3,
+    "description": "ثبت نیازمندی متقاضی (منطقه، بودجه، متراژ) و تطبیق خودکار با آگهی‌های موجود."
+  },
+  {
+    "key": "custom_service",
+    "name": "خدمت سفارشی",
+    "category": "custom",
+    "workflowKey": "custom_service",
+    "price": 300000,
+    "requiresSubscription": false,
+    "requiresReferral": false,
+    "requiredDocuments": [],
+    "sortOrder": 4,
+    "description": "قالب پارامتری برای سایر خدمات دفتر: دریافت اطلاعات، بررسی مالی، اجرا و تحویل نتیجه."
+  },
+  {
+    "key": "deed_inquiry",
+    "name": "استعلام و بررسی سند",
+    "category": "custom",
+    "workflowKey": "custom_service",
+    "price": 400000,
+    "requiresSubscription": false,
+    "requiresReferral": false,
+    "requiredDocuments": [],
+    "sortOrder": 5,
+    "description": "استعلام وضعیت سند ملک و بررسی حقوقی مقدماتی پیش از قرارداد."
+  }
+]

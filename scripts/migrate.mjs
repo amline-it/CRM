@@ -2,6 +2,10 @@
 /**
  * اجرای مهاجرت‌های SQL روی دیتابیس SQLite (بدون وابستگی بیرونی).
  * استفاده: npm run migrate [-- --status]
+ *
+ * دستور `-- @foreign-keys-off` در ابتدای فایل مهاجرت یعنی آن مهاجرت جدول والد را
+ * بازنویسی می‌کند: FK موقتاً خاموش، مهاجرت در تراکنش اتمیک، بررسی
+ * `PRAGMA foreign_key_check` پیش از commit و روشن‌کردن دوباره FK در پایان.
  */
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
@@ -46,9 +50,17 @@ for (const file of files) {
   const version = file.replace(/\.sql$/, "");
   if (applied.has(version)) continue;
   const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+  const foreignKeysOff = /^\s*--\s*@foreign-keys-off\s*$/m.test(sql);
+  if (foreignKeysOff) db.exec("PRAGMA foreign_keys = OFF");
   db.exec("BEGIN IMMEDIATE");
   try {
     db.exec(sql);
+    if (foreignKeysOff) {
+      const violations = db.prepare("PRAGMA foreign_key_check").all();
+      if (violations.length) {
+        throw new Error(`نقض کلید خارجی پس از مهاجرت: ${JSON.stringify(violations.slice(0, 3))}`);
+      }
+    }
     db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(version, new Date().toISOString());
     db.exec("COMMIT");
     count += 1;
@@ -58,6 +70,8 @@ for (const file of files) {
     console.error(`[migrate] خطا در ${file}: ${err.message}`);
     db.close();
     process.exit(1);
+  } finally {
+    if (foreignKeysOff) db.exec("PRAGMA foreign_keys = ON");
   }
 }
 

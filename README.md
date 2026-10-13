@@ -53,6 +53,7 @@ docker compose up -d --build
 | `npm test` | آزمون‌های واحد و سناریو (Vitest) |
 | `npm run e2e` | آزمون سرتاسری روی سرور در حال اجرا (سینک + وب‌هوک) |
 | `npm run test:browser` | شبیه‌سازی مسیر کامل کاربر در مرورگر (ورود، پنل، رفرش) روی سرور در حال اجرا |
+| `npm run test:ops` | آزمون سرتاسری کانبان عملیات/ارجاع/اعلان روی سرور در حال اجرا (ورود واقعی کارمند) |
 | `npm run migrate` | اعمال مهاجرت‌های SQL (`-- --status` برای مشاهده وضعیت) |
 | `npm run seed` | ثبت تعریف‌های گردش‌کار، خدمات و (با `--demo`) داده نمونه |
 | `npm run lint` | بررسی نوع‌ها با TypeScript |
@@ -63,17 +64,18 @@ docker compose up -d --build
 src/domain/engine/     موتور گردش‌کار داده‌محور (plan/available/validate) — بدون وابستگی به وب
 src/domain/guards/     گاردها (شرط‌های گذار): مدارک، مالی، حقوقی، امضا، رهگیری، …
 src/domain/effects/    افکت‌ها: رویداد تایم‌لاین، وظیفه، اعلان، فاکتور، وب‌هوک، بستن پرونده
-src/domain/service/    لایه سرویس: اجرای گذار با تراکنش + idempotency + Audit
+src/domain/service/    لایه سرویس: گذار با تراکنش + idempotency + Audit · ارجاع/اقدام مسئول/گفت‌وگوی داخلی/اعلان عملیات
 src/db/                دسترسی داده روی SQLite داخلی Node (بدون وابستگی باینری) + مهاجرت‌ها
 src/auth/              نشست JWT، scrypt، RBAC (کارشناس/مدیر)، CSRF، SSO اختیاری
 src/services/sync.ts   اینگست Push، واکشی Pull، وب‌هوک خروجی، گزارش سینک
-src/app/panel/         پنل کارکنان (داشبورد، پرونده‌ها، آگهی‌ها، نیازمندی‌ها، وظایف، مدیریت)
+src/app/panel/         پنل کارکنان (داشبورد، پرونده‌ها، آگهی‌ها، نیازمندی‌ها، وظایف، کانبان عملیات، صندوق اعلان، مدیریت)
 src/app/api/v1/        API سینک با سرور اصلی + cron وب‌هوک + سلامت
 workflow-definitions/  منبع حقیقت گردش‌کارها (قرارداد، آگهی، نیازمندی، خدمت سفارشی)
 ```
 
 مستندات بیشتر: `docs/architecture.md` · `docs/sync-api.md` (قرارداد API برای سرور شما) · `docs/deployment.md` ·
-`docs/fa/راهنمای-کاربری.md` · طراحی کامل: `docs/superpowers/specs/2026-10-13-crm-design.md`.
+`docs/fa/راهنمای-کاربری.md` · `docs/fa/کانبان-عملیات.md` (کانبان عملیات، ارجاع و ارتباط داخلی) ·
+طراحی کامل: `docs/superpowers/specs/2026-10-13-crm-design.md`.
 
 ## امنیت
 

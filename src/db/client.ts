@@ -34,15 +34,25 @@ export function closeDb(): void {
 
 export type SqlValue = string | number | null | Uint8Array;
 
+/**
+ * ردیف‌های `node:sqlite` شیءهایی با پروتوتایپ null هستند و React/Next اجازه عبور
+ * آن‌ها از مرز سرور→کلاینت را نمی‌دهد («Only plain objects … can be passed to
+ * Client Components»). پس هر ردیف به شیء ساده کپی می‌شود تا در همه صفحات پنل
+ * (کانبان، صندوق اعلان، پرونده) بی‌دردسر قابل ارسال باشد.
+ */
+function toPlain<T>(row: T): T {
+  return { ...(row as Record<string, unknown>) } as T;
+}
+
 export function all<T = Record<string, unknown>>(sql: string, params: SqlValue[] = []): T[] {
   const stmt = getDb().prepare(sql);
-  return stmt.all(...params) as T[];
+  return (stmt.all(...params) as T[]).map(toPlain);
 }
 
 export function get<T = Record<string, unknown>>(sql: string, params: SqlValue[] = []): T | null {
   const stmt = getDb().prepare(sql);
   const row = stmt.get(...params);
-  return (row as T | undefined) ?? null;
+  return row === undefined ? null : toPlain(row as T);
 }
 
 export function run(sql: string, params: SqlValue[] = []): { changes: number; lastInsertRowid: number } {

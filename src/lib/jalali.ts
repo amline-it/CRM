@@ -21,12 +21,17 @@ export function enDigits(input: string): string {
 
 /* ── الگوریتم تبدیل (jalaali) ─────────────────────────────────────── */
 
+/**
+ * تقسیم و باقی‌مانده با «کوتاه‌سازی به سمت صفر» — همان قرارداد الگوریتم استاندارد
+ * جلالی (jalaali-js). استفاده از Math.floor اینجا اشتباه است: برای عملوند منفی
+ * (مثلاً div(gm-8, 6) در فروردین) یک سال جابه‌جایی می‌سازد.
+ */
 function div(a: number, b: number): number {
-  return Math.floor(a / b);
+  return Math.trunc(a / b);
 }
 
 function mod(a: number, b: number): number {
-  return a - Math.floor(a / b) * b;
+  return a - Math.trunc(a / b) * b;
 }
 
 function jalCal(jy: number) {
@@ -61,6 +66,7 @@ function g2d(gy: number, gm: number, gd: number): number {
   return d;
 }
 
+/** JDN → میلادی (معکوس دقیق g2d) */
 function d2g(jdn: number) {
   let j = 4 * jdn + 139361631;
   j = j + div(div(4 * jdn + 183187720, 146097) * 3, 4) * 4 - 3908;

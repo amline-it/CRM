@@ -110,6 +110,9 @@ const ORG_UNITS = [
   { key: "finance", name: "واحد مالی", description: "پرداخت، فاکتور و تسویه", sort_order: 3 },
   { key: "registration", name: "واحد ثبت", description: "ثبت و تطبیق پرونده‌ها", sort_order: 4 },
   { key: "marketing", name: "واحد بازاریابی", description: "انتشار آگهی و معرفی", sort_order: 5 },
+  { key: "sales", name: "واحد فروش", description: "پیگیری قراردادها و مشتریان", sort_order: 6 },
+  { key: "management", name: "واحد مدیریت", description: "تأییدهای مدیریتی و تصمیم‌های کلان", sort_order: 7 },
+  { key: "technical", name: "واحد فنی", description: "بررسی فنی ملک و کارشناسی", sort_order: 8 },
 ];
 let orgUnitCount = 0;
 for (const unit of ORG_UNITS) {
@@ -495,6 +498,9 @@ function seedKanbanDemo() {
     { u: "finance1", n: "کارشناس مالی", unit: "finance", title: "کارشناس مالی" },
     { u: "reg1", n: "کارشناس ثبت", unit: "registration", title: "کارشناس ثبت" },
     { u: "mkt1", n: "کارشناس بازاریابی", unit: "marketing", title: "کارشناس بازاریابی" },
+    { u: "sales1", n: "کارشناس فروش", unit: "sales", title: "کارشناس فروش" },
+    { u: "mgr1", n: "مدیر عملیات", unit: "management", title: "مدیر عملیات" },
+    { u: "tech1", n: "کارشناس فنی", unit: "technical", title: "کارشناس فنی" },
   ];
   const staffIds = {};
   const unitToStaff = {};
@@ -511,6 +517,12 @@ function seedKanbanDemo() {
     unitToStaff[s.unit] = row.id;
   }
 
+  // نقشه شناسه → نام کامل (برای متن منشن) و مدیر سامانه (گیرنده نمونه اعلان)
+  const staffById = new Map(
+    db.prepare("SELECT id, full_name FROM staff WHERE active = 1").all().map((row) => [row.id, row.full_name]),
+  );
+  const adminStaffId = db.prepare("SELECT id FROM staff WHERE role = 'admin' AND active = 1 ORDER BY created_at LIMIT 1").get()?.id ?? null;
+
   const insertCase = db.prepare(
     `INSERT INTO cases (id, code, external_id, source, title, service_key, workflow_key, workflow_version, state, status, priority,
        owner_user_id, agent_user_id, assigned_staff_id, due_at, requires_tracking, access_level, attempts_payment, attempts_tracking, meta,
@@ -519,8 +531,22 @@ function seedKanbanDemo() {
        NULL, NULL, ?, NULL, 0, NULL, 0, 0, '{}', ?, ?, ?, ?, ?)`,
   );
   const insertRef = db.prepare(
-    `INSERT INTO referrals (id, case_id, from_staff_id, from_unit, to_staff_id, to_unit, kind, reason, service_key, service_name, depth, at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'custom', ?, ?, ?, ?)`,
+    `INSERT INTO referrals (id, case_id, entity_type, from_staff_id, from_unit, to_staff_id, to_unit, kind, reason,
+       description, expected_output, priority, due_at, status_before, status_after, actor_type, actor_id, actor_name,
+       service_key, service_name, depth, at, created_at, updated_at)
+     VALUES (?, ?, 'case', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'staff', ?, ?, 'custom', ?, ?, ?, ?, ?)`,
+  );
+  const insertMessage = db.prepare(
+    `INSERT INTO case_messages (id, case_id, author_staff_id, author_name, body, created_at, meta)
+     VALUES (?, ?, ?, ?, ?, ?, '{}')`,
+  );
+  const insertMention = db.prepare(
+    `INSERT INTO case_message_mentions (id, message_id, case_id, mentioned_staff_id, notified, created_at)
+     VALUES (?, ?, ?, ?, 1, ?)`,
+  );
+  const insertInbox = db.prepare(
+    `INSERT INTO notifications (id, channel, template, to_user_id, to_address, to_staff_id, case_id, body, status, kind, link, read_at, dedupe_key, sent_at, created_at)
+     VALUES (?, 'inapp', ?, NULL, NULL, ?, ?, ?, 'sent', ?, ?, NULL, ?, ?, ?)`,
   );
   const insertTimeline = db.prepare(
     `INSERT INTO timeline_events (id, case_id, kind, title, body, visibility, actor_id, actor_name, at, meta)
@@ -530,11 +556,15 @@ function seedKanbanDemo() {
   const samples = [
     {
       title: "قرارداد اجاره واحد ۱۲",
-      hops: [{ fromUnit: "reception", toUnit: "legal", toStaff: "legal1", kind: "unit", reason: "بررسی حقوقی قرارداد", status: "in_review" }],
+      hops: [{ fromUnit: "reception", toUnit: "legal", toStaff: "legal1", kind: "unit", reason: "بررسی حقوقی قرارداد", status: "in_review", dueDays: 2 }],
     },
     {
       title: "آگهی فروش ویلای شمال",
-      hops: [{ fromUnit: "reception", toUnit: "marketing", toStaff: null, kind: "unit", reason: "انتشار در پایگاه آگهی", status: "waiting_info" }],
+      hops: [{ fromUnit: "reception", toUnit: "marketing", toStaff: null, kind: "unit", reason: "انتشار در پایگاه آگهی", status: "waiting_info", dueDays: 5 }],
+    },
+    {
+      title: "استعلام سند ملک کلاردشت",
+      hops: [{ fromUnit: "reception", toUnit: "legal", toStaff: "legal1", kind: "unit", reason: "استعلام سند و بازبینی مدارک", status: "in_review", dueDays: -1 }],
     },
     {
       title: "درخواست تطبیق نیازمندی",
@@ -551,15 +581,109 @@ function seedKanbanDemo() {
     const assignedId = lastHop.toStaff ? staffIds[lastHop.toStaff] : null;
     insertCase.run(caseId, sample.title, assignedId, nowIso(), nowIso(), nowIso(), nowIso(), lastHop.status);
     let depth = 0;
+    let lastDueAt = null;
+    let lastPriority = "normal";
     for (const hop of sample.hops) {
       depth += 1;
       const fromStaffId = unitToStaff[hop.fromUnit] ?? null;
       const toStaffId = hop.toStaff ? staffIds[hop.toStaff] : null;
-      insertRef.run(id("ref"), caseId, fromStaffId, hop.fromUnit, toStaffId, hop.toUnit, hop.kind, hop.reason, sample.title, nowIso(), nowIso(), depth);
+      const dueDays = Number.isFinite(hop.dueDays) ? hop.dueDays : depth === 1 ? 2 : 5;
+      const dueAt = new Date(Date.now() + dueDays * 86400000).toISOString();
+      lastDueAt = dueAt;
+      lastPriority = hop.priority ?? "normal";
+      const isLastHop = hop === sample.hops[sample.hops.length - 1];
+      // وضعیت «پس از ارجاع» همیشه «ارجاع‌شده» است؛ وضعیت جاری کارت روی آخرین گام ثبت می‌شود
+      const statusAfter = isLastHop ? hop.status : "new";
+      const refId = id("ref");
+      insertRef.run(
+        refId,
+        caseId,
+        fromStaffId,
+        hop.fromUnit,
+        toStaffId,
+        hop.toUnit,
+        hop.kind ?? "unit",
+        hop.reason,
+        hop.description ?? "شرح کار در نمونه دمو",
+        hop.expectedOutput ?? "نتیجه بررسی و ثبت در پرونده",
+        hop.priority ?? "normal",
+        dueAt,
+        hop.statusBefore ?? "new",
+        statusAfter,
+        fromStaffId,
+        unitToStaff[hop.fromUnit] ? staffLabel(hop.fromUnit) : "کانبان",
+        sample.title,
+        depth,
+        nowIso(),
+        nowIso(),
+        nowIso(),
+      );
       insertTimeline.run(id("tle"), caseId, `ارجاع به واحد ${hop.toUnit}`, hop.reason, fromStaffId, nowIso());
     }
+    // مثل سرویس واقعی ارجاع: مهلت و اولویت عملیات روی خود پرونده هم به‌روزرسانی می‌شود
+    db.prepare("UPDATE cases SET due_at = ?, priority = ? WHERE id = ?").run(lastDueAt, lastPriority, caseId);
+
+    // گفت‌وگوی داخلی نمونه + منشن همکار (بدون انتقال مسئولیت)
+    const authorUnit = sample.hops[0].fromUnit;
+    const authorId = unitToStaff[authorUnit] ?? null;
+    const lastHopRef = sample.hops[sample.hops.length - 1];
+    const secondUnit = lastHopRef.toUnit;
+    const mentionedId = unitToStaff[secondUnit] ?? null;
+    const messageId = id("msg");
+    const messageAt = nowIso();
+    // هدف‌های منشن: کارمند واحد مقصد + مدیر سامانه (منشن مسئولیت را منتقل نمی‌کند)
+    const mentionTargets = [];
+    if (mentionedId && mentionedId !== authorId) mentionTargets.push(mentionedId);
+    if (adminStaffId && adminStaffId !== authorId && adminStaffId !== mentionedId) mentionTargets.push(adminStaffId);
+    const mentionText = mentionTargets.map((sid) => `@${staffById.get(sid) ?? ""}`).filter((t) => t !== "@").join(" و ");
+    insertMessage.run(
+      messageId,
+      caseId,
+      authorId,
+      authorId ? staffLabel(authorUnit) : "کانبان",
+      `پرونده «${sample.title}» ثبت شد. ${mentionText ? `${mentionText} ` : ""}لطفاً بررسی کنید و نتیجه را در همین گفت‌وگو ثبت کنید.`,
+      messageAt,
+    );
+    for (const targetId of mentionTargets) {
+      insertMention.run(id("men"), messageId, caseId, targetId, messageAt);
+      insertInbox.run(
+        id("ntf"),
+        "mention",
+        targetId,
+        caseId,
+        `شما در گفت‌وگوی پرونده «${sample.title}» منشن شدید`,
+        "mention",
+        `/panel/cases/${caseId}#conversation`,
+        `ops:demo:mention:${messageId}:${targetId}`,
+        messageAt,
+        messageAt,
+      );
+    }
+    const ownerId = assignedId ?? mentionedId;
+    if (ownerId) {
+      insertInbox.run(
+        id("ntf"),
+        lastHopRef.toStaff ? "referral.new" : "referral.queue",
+        ownerId,
+        caseId,
+        lastHopRef.toStaff
+          ? `ارجاع تازه: عملیات پرونده «${sample.title}» به شما سپرده شد`
+          : `عملیات پرونده «${sample.title}» در صف واحد شما قرار گرفت`,
+        lastHopRef.toStaff ? "referral.new" : "referral.queue",
+        `/panel/cases/${caseId}#ops-quick-actions`,
+        `ops:demo:referral:${caseId}:${ownerId}`,
+        nowIso(),
+        nowIso(),
+      );
+    }
   }
-  console.log("[seed] کانبان ارجاع: نمونه کارشناسان و پرونده‌های ارجاعی ساخته شد");
+  console.log("[seed] کانبان عملیات: کارشناسان، پرونده‌های ارجاعی، گفت‌وگو و اعلان‌های نمونه ساخته شد");
+}
+
+/** برچسب فارسی واحد برای متن نمونه */
+function staffLabel(unitKey) {
+  const found = ORG_UNITS.find((unit) => unit.key === unitKey);
+  return found ? found.name : unitKey;
 }
 
 /** hash سازگار با scrypt در src/auth/password.ts (فرمت scrypt$N$r$p$salt$hash) */

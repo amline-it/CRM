@@ -137,9 +137,14 @@ export interface NotificationRow {
   template: string;
   to_user_id: string | null;
   to_address: string | null;
+  to_staff_id: string | null;
   case_id: string | null;
   body: string;
   status: string;
+  kind: string | null;
+  link: string | null;
+  read_at: string | null;
+  dedupe_key: string | null;
   error: string | null;
   provider: string | null;
   sent_at: string | null;
@@ -173,11 +178,158 @@ export function markNotification(id: string, status: "sent" | "failed", provider
   ]);
 }
 
-export function listNotifications(caseId?: string, limit = 100): NotificationRow[] {
+/**
+ * گزارش پیام‌های بیرونی (پیامک/ایمیل به کاربر یا مشاور).
+ * اعلان‌های داخلی کارمندان (channel='inapp') عمداً در این فهرست نمی‌آیند تا
+ * محتوای داخلی هرگز در گزارش‌ها یا پاسخ‌های مشتری دیده نشود.
+ */
+export function listNotifications(caseId?: string, limit = 100, opts: { includeInternal?: boolean } = {}): NotificationRow[] {
+  const filter = opts.includeInternal ? "" : " AND (channel != 'inapp' OR channel IS NULL) AND to_staff_id IS NULL";
   if (caseId) {
-    return all<NotificationRow>("SELECT * FROM notifications WHERE case_id = ? ORDER BY created_at DESC LIMIT ?", [caseId, limit]);
+    return all<NotificationRow>(
+      `SELECT * FROM notifications WHERE case_id = ?${filter} ORDER BY created_at DESC LIMIT ?`,
+      [caseId, limit],
+    );
   }
-  return all<NotificationRow>("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?", [limit]);
+  return all<NotificationRow>(`SELECT * FROM notifications WHERE 1 = 1${filter} ORDER BY created_at DESC LIMIT ?`, [limit]);
+}
+
+/* ── صندوق اعلان داخلی (کارمندان) ──────────────────────────────────
+ * همان جدول `notifications` با channel='inapp' و status='sent'؛ گیرنده داخلی در
+ * ستون to_staff_id است. `dedupe_key` یگانه جلوی اعلان تکراری در درخواست/اجرای
+ * تکراری (مثلاً زمان‌بند سررسید) را می‌گیرد.
+ */
+
+export interface StaffInboxRow {
+  id: string;
+  channel: string;
+  template: string;
+  kind: string | null;
+  to_staff_id: string | null;
+  case_id: string | null;
+  body: string;
+  link: string | null;
+  read_at: string | null;
+  status: string;
+  dedupe_key: string | null;
+  created_at: string;
+}
+
+/**
+ * ثبت اعلان داخلی. اگر `dedupeKey` تکراری باشد، اعلان تازه ساخته نمی‌شود
+ * و id ردیف موجود برگردانده می‌شود (عملیات idempotent).
+ */
+export function insertInboxNotification(row: {
+  staffId: string;
+  kind: string;
+  template: string;
+  body: string;
+  caseId?: string | null;
+  link?: string | null;
+  dedupeKey?: string | null;
+  actorName?: string | null;
+}): { id: string; created: boolean } {
+  if (row.dedupeKey) {
+    const existing = get<{ id: string }>("SELECT id FROM notifications WHERE dedupe_key = ?", [row.dedupeKey]);
+    if (existing) return { id: existing.id, created: false };
+  }
+  const id = newId("ntf");
+  try {
+    run(
+      `INSERT INTO notifications (id, channel, template, to_user_id, to_address, to_staff_id, case_id, body, status, kind, link, dedupe_key, sent_at, created_at)
+       VALUES (?, 'inapp', ?, NULL, NULL, ?, ?, ?, 'sent', ?, ?, ?, ?, ?)`,
+      [
+        id,
+        row.template,
+        row.staffId,
+        row.caseId ?? null,
+        row.body,
+        row.kind,
+        row.link ?? null,
+        row.dedupeKey ?? null,
+        nowIso(),
+        nowIso(),
+      ],
+    );
+  } catch (err) {
+    // شرط یگانگی dedupe_key در درخواست هم‌زمان → همان ردیف موجود برگردانده می‌شود
+    if (row.dedupeKey) {
+      const existing = get<{ id: string }>("SELECT id FROM notifications WHERE dedupe_key = ?", [row.dedupeKey]);
+      if (existing) return { id: existing.id, created: false };
+    }
+    throw err;
+  }
+  return { id, created: true };
+}
+
+export function listInbox(
+  staffId: string,
+  opts: { unreadOnly?: boolean; kind?: string; caseId?: string; limit?: number; offset?: number } = {},
+): StaffInboxRow[] {
+  const clauses = ["to_staff_id = ?", "channel = 'inapp'"];
+  const params: Array<string | number> = [staffId];
+  if (opts.unreadOnly) clauses.push("read_at IS NULL");
+  if (opts.kind) {
+    clauses.push("kind = ?");
+    params.push(opts.kind);
+  }
+  if (opts.caseId) {
+    clauses.push("case_id = ?");
+    params.push(opts.caseId);
+  }
+  params.push(opts.limit ?? 50, opts.offset ?? 0);
+  return all<StaffInboxRow>(
+    `SELECT id, channel, template, kind, to_staff_id, case_id, body, link, read_at, status, dedupe_key, created_at
+     FROM notifications WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+    params,
+  );
+}
+
+export function countUnreadInbox(staffId: string, kind?: string): number {
+  const params: string[] = [staffId];
+  let extra = "";
+  if (kind) {
+    extra = " AND kind = ?";
+    params.push(kind);
+  }
+  return (
+    get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM notifications WHERE to_staff_id = ? AND channel = 'inapp' AND read_at IS NULL${extra}`,
+      params,
+    )?.n ?? 0
+  );
+}
+
+/** علامت‌گذاری یک اعلان به‌عنوان خوانده‌شده (فقط برای مالک همان اعلان) */
+export function markInboxRead(staffId: string, id: string): boolean {
+  const result = run(
+    "UPDATE notifications SET read_at = ? WHERE id = ? AND to_staff_id = ? AND read_at IS NULL",
+    [nowIso(), id, staffId],
+  );
+  if (result.changes > 0) return true;
+  const mine = get<{ id: string }>("SELECT id FROM notifications WHERE id = ? AND to_staff_id = ?", [id, staffId]);
+  return Boolean(mine);
+}
+
+export function markAllInboxRead(staffId: string, kind?: string): number {
+  const params: string[] = [nowIso(), staffId];
+  let extra = "";
+  if (kind) {
+    extra = " AND kind = ?";
+    params.push(kind);
+  }
+  return run(
+    `UPDATE notifications SET read_at = ? WHERE to_staff_id = ? AND channel = 'inapp' AND read_at IS NULL${extra}`,
+    params,
+  ).changes;
+}
+
+/** پاک‌سازی اعلان‌های خوانده‌شده قدیمی (نگهداری) */
+export function purgeReadInbox(staffId: string, olderThanIso: string): number {
+  return run("DELETE FROM notifications WHERE to_staff_id = ? AND channel = 'inapp' AND read_at IS NOT NULL AND read_at < ?", [
+    staffId,
+    olderThanIso,
+  ]).changes;
 }
 
 /* ── سینک ────────────────────────────────────────────────────────── */

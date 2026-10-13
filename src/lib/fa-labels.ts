@@ -46,13 +46,18 @@ export const ACCESS_LEVEL_LABELS: Record<string, string> = {
   staff: "کارشناسان داخلی",
 };
 
-/** وضعیت کارت در کانبان ارجاع (درون واحد) */
+/**
+ * وضعیت کارت در کانبان عملیات.
+ * نگاشت با خواسته کسب‌وکار: `new` = ارجاع‌شده (تازه در واحد) · `cancelled` = لغوشده.
+ * کلیدها همان کلیدهای موجود دیتابیس‌اند (بدون وضعیت تکراری).
+ */
 export const KANBAN_STATUS_LABELS: Record<string, string> = {
-  new: "تازه‌وارد",
+  new: "ارجاع‌شده",
   in_review: "در حال بررسی",
   waiting_info: "منتظر اطلاعات",
   returned_correction: "برگشت برای اصلاح",
   done: "انجام‌شده",
+  cancelled: "لغوشده",
 };
 
 /** لحن (رنگ نشان) هر وضعیت کانبان برای نمایش */
@@ -62,7 +67,11 @@ export const KANBAN_STATUS_TONE: Record<string, "muted" | "info" | "warning" | "
   waiting_info: "warning",
   returned_correction: "danger",
   done: "success",
+  cancelled: "danger",
 };
+
+/** برچسب کوتاه برای فیلتر وضعیت */
+export const KANBAN_STATUS_ORDER = ["new", "in_review", "waiting_info", "returned_correction", "done", "cancelled"] as const;
 
 /** نوع ارجاع: به همکار یا به واحد */
 export const REFERRAL_KIND_LABELS: Record<string, string> = {
@@ -73,10 +82,64 @@ export const REFERRAL_KIND_LABELS: Record<string, string> = {
 /** اقدامات مسئول جدید روی کارت */
 export const KANBAN_ACTION_LABELS: Record<string, string> = {
   start_review: "شروع رسیدگی",
-  need_info: "نیاز به اطلاعات",
+  need_info: "درخواست اطلاعات",
   return_correction: "برگشت برای اصلاح",
   rerefer: "ارجاع مجدد",
   complete: "اتمام کار",
+  cancel: "لغو عملیات",
+};
+
+/** نوع رویداد در تاریخچه یکپارچه عملیات (پیام / ارجاع / رویداد سیستمی) */
+export const OPS_EVENT_TYPE_LABELS: Record<string, string> = {
+  message: "پیام داخلی",
+  referral: "ارجاع رسمی",
+  system: "رویداد سیستمی",
+};
+
+/** انواع اعلان داخلی (صندوق اعلان) */
+export const INBOX_KIND_LABELS: Record<string, string> = {
+  "referral.new": "ارجاع جدید به شما",
+  "referral.queue": "قرارگیری در صف واحد",
+  "referral.owner_changed": "تغییر مسئول عملیات",
+  "referral.returned": "برگشت برای اصلاح",
+  "referral.done": "پایان عملیات",
+  "referral.cancelled": "لغو عملیات",
+  "referral.rereferred": "اقدام مجدد روی عملیات",
+  mention: "منشن همکار",
+  "message.new": "پیام جدید در گفت‌وگو",
+  "ops.due_soon": "نزدیک شدن سررسید",
+  "ops.overdue": "عبور از مهلت رسیدگی",
+};
+
+export const INBOX_KIND_TONE: Record<string, "muted" | "info" | "warning" | "danger" | "success"> = {
+  "referral.new": "info",
+  "referral.queue": "warning",
+  "referral.owner_changed": "muted",
+  "referral.returned": "danger",
+  "referral.done": "success",
+  "referral.cancelled": "muted",
+  "referral.rereferred": "warning",
+  mention: "info",
+  "message.new": "muted",
+  "ops.due_soon": "warning",
+  "ops.overdue": "danger",
+};
+
+/** دسته‌بندی اعلان برای فیلتر صندوق اعلان */
+export const INBOX_FILTERS: Array<{ key: string; label: string; kinds: string[] }> = [
+  { key: "all", label: "همه", kinds: [] },
+  { key: "referral", label: "ارجاع‌ها", kinds: ["referral.new", "referral.queue", "referral.owner_changed", "referral.rereferred", "referral.returned"] },
+  { key: "message", label: "پیام و منشن", kinds: ["mention", "message.new"] },
+  { key: "due", label: "سررسید", kinds: ["ops.due_soon", "ops.overdue"] },
+  { key: "done", label: "نتیجه عملیات", kinds: ["referral.done", "referral.cancelled"] },
+];
+
+/** نوع خدمت (دسته‌بندی) در کارت کانبان */
+export const SERVICE_KIND_LABELS: Record<string, string> = {
+  contract: "قرارداد",
+  listing: "آگهی",
+  requirements: "نیازمندی",
+  custom: "سایر خدمات",
 };
 
 export const CONTRACT_TYPE_LABELS: Record<string, string> = {

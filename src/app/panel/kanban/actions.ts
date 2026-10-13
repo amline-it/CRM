@@ -96,6 +96,8 @@ export async function createKanbanCardAction(_prev: ActionState, form: FormData)
       serviceKey,
       title,
       priority: text(form, "priority") ?? undefined,
+      dueAt: text(form, "dueAt"),
+      description: text(form, "description"),
     });
     revalidatePath(KANBAN_REVALIDATE);
     return { message: `کارت «${title}» ایجاد و در واحد شما ثبت شد (${caseId})` };

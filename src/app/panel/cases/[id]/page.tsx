@@ -5,7 +5,10 @@ import { can } from "@/auth/rbac";
 import * as Cases from "@/db/repos/cases";
 import * as Catalog from "@/db/repos/catalog";
 import * as People from "@/db/repos/people";
+import * as Referrals from "@/db/repos/referrals";
 import * as Svc from "@/domain/service/case-service";
+import { CaseOpsPanel } from "@/components/ops/case-ops-panel";
+import type { UnitOption } from "@/components/ops/quick-actions";
 import { AppError } from "@/lib/errors";
 import { faMoney, faNumber } from "@/lib/money";
 import { toJalali, toJalaliDateTime, relativeFa } from "@/lib/jalali";
@@ -62,6 +65,29 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const available = detail.available;
   const { row, runtime, stateInfo, definition } = detail;
   const staffList = People.listActiveStaff();
+  const opsUnits: UnitOption[] = Referrals.listOrgUnits().map((unit) => ({
+    key: unit.key,
+    name: unit.name,
+    description: unit.description,
+    staff: staffList
+      .filter((s) => s.org_unit === unit.key)
+      .map((s) => ({ id: s.id, fullName: s.full_name, title: s.title })),
+  }));
+  const opsStaff = staffList.map((s) => {
+    const unit = s.org_unit ? Referrals.getOrgUnit(s.org_unit) : null;
+    return { id: s.id, fullName: s.full_name, title: s.title, unitKey: s.org_unit, unitName: unit?.name ?? null };
+  });
+  // رویدادهای عملیات در تایم‌لاین؛ `referral.sent` اینجا حذف می‌شود چون در تاریخچه ارجاع با جزئیات کامل‌تر آمده است
+  const opsEvents = detail.timeline
+    .filter((event) => event.kind.startsWith("referral.") && event.kind !== "referral.sent")
+    .map((event) => ({
+      id: event.id,
+      kind: event.kind,
+      title: event.title,
+      body: event.body,
+      actorName: event.actor_name,
+      at: event.at,
+    }));
   const signatureParties = Svc.requiredSignaturesFor(runtime.contract ?? null);
   const openTasks = detail.tasks.filter((t) => t.status === "open" || t.status === "in_progress");
   const doneTasks = detail.tasks.filter((t) => t.status === "done");
@@ -144,6 +170,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
           </div>
         ) : null}
       </div>
+
+      <CaseOpsPanel caseId={row.id} csrf={csrf} units={opsUnits} staff={opsStaff} events={opsEvents} />
 
       <div className="grid grid-2">
         <div className="card">
