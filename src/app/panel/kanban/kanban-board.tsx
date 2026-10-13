@@ -360,9 +360,14 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
                   card={card}
                   busy={busyCardId === card.caseId}
                   onOpen={() => setActiveCardId(card.caseId)}
-                  onDragStart={() => {
+                  onDragStart={(event) => {
+                    // مثل کارت‌های ستون‌ها: هم state و هم dataTransfer (فایرفاکس بدون setData درگ را شروع نمی‌کند)
                     dragRef.current = { type: "card", id: card.caseId };
+                    event.dataTransfer.setData("text/card", card.caseId);
+                    event.dataTransfer.effectAllowed = "move";
                     setDragCardId(card.caseId);
+                    setColDragKey(null);
+                    setColDropKey(null);
                   }}
                   onDragEnd={() => {
                     dragRef.current = null;
