@@ -6,8 +6,8 @@
  *
  * دو جابه‌جایی روی تخته انجام می‌شود:
  *   ۱) **کارت** را بکشید روی ستون واحد مقصد → ارجاع رسمی (تغییر واحد/مسئول).
- *   ۲) **ستون** را از دستهٔ بالای آن بکشید و جای دیگری رها کنید (یا از دکمه‌های
- *      ←/→ در سرستون استفاده کنید) → ترتیب ستون‌ها. ترتیب با
+ *   ۲) **ستون** را از سرستون (دستهٔ ⠿) بکشید و روی ستون دیگری رها کنید → ترتیب
+ *      ستون‌ها. تنها راه جابه‌جایی ستون همین درگ‌انددراپ است. ترتیب با
  *      `PUT /api/v1/ops/board/columns` روی سرور ذخیره می‌شود: به‌صورت پیش‌فرض
  *      چیدمان شخصی همین کارمند و با دکمه «ترتیب پیش‌فرض همه» برای مدیر، ترتیب
  *      مشترک تیم. تا پاسخ سرور، ترتیب قبلی معتبر است و در خطا برمی‌گردد.
@@ -25,7 +25,7 @@ import {
   SERVICE_KIND_LABELS,
 } from "@/lib/fa-labels";
 import { relativeFa, toJalaliDateTime } from "@/lib/jalali";
-import { moveColumnKey, shiftColumnKey } from "@/lib/board-order";
+import { moveColumnKey } from "@/lib/board-order";
 import { opsFetch, newIdempotencyKey } from "@/components/ops/api";
 import { QuickActions, type OpsState, type UnitOption } from "@/components/ops/quick-actions";
 import { Conversation, type ConversationViewData } from "@/components/ops/conversation";
@@ -139,13 +139,6 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
     void persistColumnOrder(next, "personal");
   }
 
-  function shiftColumn(key: string, direction: "right" | "left") {
-    const next = shiftColumnKey(orderForRender, key, direction);
-    if (next === orderForRender) return;
-    setLocal((prev) => ({ ...prev, order: next }));
-    void persistColumnOrder(next, "personal");
-  }
-
   /**
    * رهاکردن روی ستون:
    *   - اگر ستون کشیده شده باشد → جابه‌جایی ترتیب ستون‌ها
@@ -200,8 +193,8 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
           {board.stats.unreadMessages} پیام خوانده‌نشده
         </span>
         <span className="small muted">
-          کارت را روی ستون واحد مقصد رها کنید تا ارجاع رسمی ثبت شود · برای جابه‌جایی ستون‌ها، دستهٔ ⠿ سرستون را بکشید یا از
-          دکمه‌های ←/→ استفاده کنید.
+          کارت را روی ستون واحد مقصد رها کنید تا ارجاع رسمی ثبت شود · برای جابه‌جایی ستون‌ها، دستهٔ ⠿ سرستون را بکشید و روی
+          ستون مقصد رها کنید.
         </span>
       </div>
 
@@ -320,7 +313,6 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
             onDrop={(event) => void dropOnUnit(event, column.unitKey)}
             isColumnDrag={colDragKey === column.unitKey}
             isColumnDrop={colDropKey === column.unitKey && colDragKey !== column.unitKey}
-            orderBusy={savingOrder}
             onColumnDragStart={(event) => {
               dragRef.current = { type: "column", id: column.unitKey };
               event.dataTransfer.setData("text/column", column.unitKey);
@@ -334,12 +326,6 @@ export function KanbanBoard({ board, csrf, units, staff }: Props) {
               setColDragKey(null);
               setColDropKey(null);
             }}
-            onColumnShift={(direction) => {
-              if (savingOrder) return;
-              shiftColumn(column.unitKey, direction);
-            }}
-            shiftDisabledLeft={orderForRender.indexOf(column.unitKey) >= orderForRender.length - 1}
-            shiftDisabledRight={orderForRender.indexOf(column.unitKey) <= 0}
           />
         ))}
 
@@ -410,13 +396,9 @@ interface ColumnProps {
   isColumnDrag: boolean;
   /** این ستون مقصد رهاکردن ستون دیگری است */
   isColumnDrop: boolean;
-  orderBusy: boolean;
   onDragLeave: () => void;
   onColumnDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
   onColumnDragEnd: () => void;
-  onColumnShift: (direction: "right" | "left") => void;
-  shiftDisabledLeft: boolean;
-  shiftDisabledRight: boolean;
 }
 
 function KanbanColumn({
@@ -430,13 +412,9 @@ function KanbanColumn({
   onDrop,
   isColumnDrag,
   isColumnDrop,
-  orderBusy,
   onDragLeave,
   onColumnDragStart,
   onColumnDragEnd,
-  onColumnShift,
-  shiftDisabledLeft,
-  shiftDisabledRight,
 }: ColumnProps) {
   const overdue = column.cards.filter((c) => c.overdue).length;
   const className = [
@@ -457,28 +435,6 @@ function KanbanColumn({
         <span className="flex" style={{ gap: 6, alignItems: "center" }}>
           {overdue ? <span className="badge danger">{overdue} عقب‌افتاده</span> : null}
           <span className="badge muted">{column.cards.length}</span>
-          <span className="col-shift">
-            <button
-              type="button"
-              className="col-shift-btn"
-              title="جابه‌جایی ستون به راست"
-              aria-label={`جابه‌جایی ستون ${column.unitName} به راست`}
-              disabled={shiftDisabledRight || orderBusy}
-              onClick={() => onColumnShift("right")}
-            >
-              ›
-            </button>
-            <button
-              type="button"
-              className="col-shift-btn"
-              title="جابه‌جایی ستون به چپ"
-              aria-label={`جابه‌جایی ستون ${column.unitName} به چپ`}
-              disabled={shiftDisabledLeft || orderBusy}
-              onClick={() => onColumnShift("left")}
-            >
-              ‹
-            </button>
-          </span>
         </span>
       </div>
       {column.unitDescription ? <div className="kanban-col-desc">{column.unitDescription}</div> : null}

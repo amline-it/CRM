@@ -607,6 +607,30 @@ describe("۱۴) جابه‌جایی و چیدمان ستون‌های کانبا
     expect(Columns.readPersonalColumnOrder(legalStaff)).toBeNull();
   });
 
+  it("ثبت ترتیب پیش‌فرض تیم، چیدمان شخصی همان مدیر را پاک می‌کند تا پیش‌فرض تازه را ببیند", () => {
+    const keys = Referrals.listOrgUnits().map((u) => u.key);
+    const viewer = { id: "stf_test_admin_view", role: "staff" as const, unit: null, name: "بیننده مدیر" };
+    try {
+      // مدیر اول چیدمان شخصی دارد (مثلاً با درگ ستون‌ها)
+      Columns.savePersonalColumnOrder(viewer.id, [keys[2], keys[1], keys[0]]);
+      expect(Columns.readPersonalColumnOrder(viewer.id)).toEqual([keys[2], keys[1], keys[0]]);
+
+      const teamOrder = [keys[1], keys[2], keys[0]];
+      const applied = Columns.applyTeamColumnOrder(teamOrder, viewer.id);
+      expect(applied.slice(0, 3)).toEqual(teamOrder);
+
+      // چیدمان شخصی پاک شده و ترتیب مشترک برای همه (از جمله خودش) دیده می‌شود
+      expect(Columns.readPersonalColumnOrder(viewer.id)).toBeNull();
+      expect(Columns.columnLayout(viewer.id).source).toBe("default");
+      expect(Columns.columnLayout(legalStaff2).source).toBe("default");
+      expect(Referrals.listOrgUnits().map((u) => u.key).slice(0, 3)).toEqual(teamOrder);
+    } finally {
+      Columns.clearPersonalColumnOrder(viewer.id);
+      Columns.saveDefaultColumnOrder(keys); // بازگشت به ترتیب اولیه برای بقیه آزمون‌ها
+    }
+    expect(Referrals.listOrgUnits().map((u) => u.key)).toEqual(keys);
+  });
+
   it("کارت‌ها با جابه‌جایی ستون‌ها جابه‌جا نمی‌شوند (ستون = واحد مقصد، نه شکل ذخیره‌سازی)", () => {
     const caseId = newCase("کارت پایدار در ستون");
     Svc.referCase({ caseId, actor: sales, kind: "unit", toUnit: "legal", reason: "چیدمان ستون‌ها" });
@@ -619,7 +643,7 @@ describe("۱۴) جابه‌جایی و چیدمان ستون‌های کانبا
   }, 20000);
 });
 
-describe("۱۵) محاسبه جابه‌جایی ستون‌ها (ریاضی درگ‌انددراپ) — منطق مشترک کلاینت/سرور", () => {
+describe("۱۵) محاسبه جابه‌جایی ستون‌ها (فقط درگ‌انددراپ) — منطق مشترک کلاینت/سرور", () => {
   const order = ["a", "b", "c", "d"];
 
   it("رهاکردن ستون روی ستون دیگر، آن را پیش از مقصد درج می‌کند", () => {
@@ -640,12 +664,12 @@ describe("۱۵) محاسبه جابه‌جایی ستون‌ها (ریاضی د�
     expect(order).toEqual(snapshot); // تابع خالص است و آرایه ورودی را دست نمی‌زند
   });
 
-  it("دکمه‌های ←/→ یک گام جابه‌جا می‌کنند و از لبه‌ها عبور نمی‌کنند", () => {
-    expect(BoardOrder.shiftColumnKey(order, "c", "right")).toEqual(["a", "c", "b", "d"]); // راست = ابتدای تخته (RTL)
-    expect(BoardOrder.shiftColumnKey(order, "b", "left")).toEqual(["a", "c", "b", "d"]);
-    expect(BoardOrder.shiftColumnKey(order, "a", "right")).toEqual(order); // اولین ستون راست‌تر نمی‌رود
-    expect(BoardOrder.shiftColumnKey(order, "d", "left")).toEqual(order); // آخرین ستون چپ‌تر نمی‌رود
-    expect(BoardOrder.shiftColumnKey(order, "x", "left")).toEqual(order);
+  it("درگ‌انددراپ تنها راه جابه‌جایی است: رهاکردن روی اولین/آخرین/میانی درست درج می‌کند", () => {
+    expect(BoardOrder.moveColumnKey(order, "c", "a")).toEqual(["c", "a", "b", "d"]); // روی اولین ستون
+    expect(BoardOrder.moveColumnKey(order, "b", "d")).toEqual(["a", "c", "b", "d"]); // روی آخرین ستون
+    expect(BoardOrder.moveColumnKey(order, "d", "b")).toEqual(["a", "d", "b", "c"]); // روی ستون میانی
+    // دکمه/تابع یک‌گامه‌ای وجود ندارد (تصمیم محصولی: فقط درگ‌انددراپ)
+    expect("shiftColumnKey" in BoardOrder).toBe(false);
   });
 
   it("ادغام ترتیب ذخیره‌شده با ستون‌های واقعی: بدون تکرار و بدون از دست رفتن ستون", () => {

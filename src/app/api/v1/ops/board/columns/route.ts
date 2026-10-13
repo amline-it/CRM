@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
     } else {
       const order = Columns.parseColumnOrder(body.order);
       if (scope === "default") {
-        Columns.saveDefaultColumnOrder(order);
+        Columns.applyTeamColumnOrder(order, session.staff.id);
         // چیدمان مشترک، تنظیمات تیمی است → در گزارش رویدادها ثبت می‌شود
         Platform.writeAudit({
           actorType: session.role,

@@ -426,11 +426,27 @@ describeIfServer("پذیرش سرتاسری عملیات روی سرور واق�
 
   it("جابه‌جایی ستون‌ها: ترتیب شخصی ذخیره/بازنشانی می‌شود، ترتیب پیش‌فرض فقط برای مدیر است", async () => {
     const legal = client(legalTicket);
+    const tech = client(techTicket);
+    const adminClient = client(adminTicket);
+
+    // آزمون خودکفا: از وضعیت تمیز شروع می‌کنیم (مستقل از اجراهای قبلی روی همین دیتابیس)
+    const base = await adminClient.call<{ order: string[] }>("PUT", "/api/v1/ops/board/columns", {
+      reset: true,
+      scope: "default",
+    });
+    expect(base.status).toBe(200);
+    await legal.call("PUT", "/api/v1/ops/board/columns", { reset: true, scope: "personal" });
+    await tech.call("PUT", "/api/v1/ops/board/columns", { reset: true, scope: "personal" });
+    await adminClient.call("PUT", "/api/v1/ops/board/columns", { reset: true, scope: "personal" });
+
     const initial = await legal.get<Board>("/api/v1/ops/board");
     expect(initial.status).toBe(200);
     const keys = initial.data.columnOrder;
     expect(keys.length).toBe(initial.data.columns.length);
     expect(initial.data.canSetDefaultOrder).toBe(false);
+    expect(initial.data.columnOrderSource).toBe("default");
+    expect(initial.data.columnOrder).toEqual(base.data.order);
+    expect(keys[0]).not.toBe(keys[1]);
 
     // کارمند عادی: جابه‌جایی دو ستون اول و ذخیره روی سرور
     const swapped = [keys[1], keys[0], ...keys.slice(2)];
@@ -451,7 +467,7 @@ describeIfServer("پذیرش سرتاسری عملیات روی سرور واق�
     expect(after.data.units.map((u) => u.key)).toEqual(swapped);
 
     // همین ترتیب شخصی روی کارمند دیگر اثری ندارد
-    const other = await client(techTicket).get<Board>("/api/v1/ops/board");
+    const other = await tech.get<Board>("/api/v1/ops/board");
     expect(other.data.columnOrderSource).toBe("default");
     expect(other.data.columnOrder).toEqual(keys);
 
@@ -461,7 +477,6 @@ describeIfServer("پذیرش سرتاسری عملیات روی سرور واق�
     expect(String(forbidden.raw.message)).toContain("مدیر");
 
     // مدیریت: ترتیب پیش‌فرض همه
-    const adminClient = client(adminTicket);
     const asDefault = await adminClient.call<{ order: string[]; source: string }>("PUT", "/api/v1/ops/board/columns", {
       order: swapped,
       scope: "default",
@@ -480,9 +495,29 @@ describeIfServer("پذیرش سرتاسری عملیات روی سرور واق�
     expect(resetPersonal.data.source).toBe("default");
     const resetDefault = await adminClient.call<{ order: string[] }>("PUT", "/api/v1/ops/board/columns", { reset: true, scope: "default" });
     expect(resetDefault.status).toBe(200);
+    expect(resetDefault.data.order).toEqual(base.data.order); // همان ترتیب پیش‌فرض سازمانی
     expect(resetDefault.data.order).not.toEqual(swapped);
-    const finalBoard = await client(techTicket).get<Board>("/api/v1/ops/board");
+    const finalBoard = await tech.get<Board>("/api/v1/ops/board");
     expect(finalBoard.data.columnOrder).toEqual(resetDefault.data.order);
+    expect(finalBoard.data.columnOrderSource).toBe("default");
+  });
+
+  it("جابه‌جایی ستون‌ها فقط با درگ‌انددراپ است: HTML تخته دکمه یک‌گامه ندارد", async () => {
+    const response = await fetch(`${BASE}/panel/kanban`, {
+      headers: { "x-session-ticket": legalTicket, accept: "text/html" },
+      redirect: "manual",
+    });
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    // ستون‌ها قابل کشیدن‌اند و دسته جابه‌جایی دارند
+    expect((html.match(/kanban-col-head col-draggable/g) ?? []).length).toBeGreaterThan(4);
+    expect(html).toContain("kanban-col-grip");
+    expect(html).toContain('draggable="true"');
+    // هیچ دکمه/نشانه‌ای برای جابه‌جایی یک‌گامه ستون نمانده است
+    expect(html).not.toContain("col-shift-btn");
+    expect(html).not.toContain("col-shift");
+    expect(html).not.toContain("جابه‌جایی ستون به راست");
+    expect(html).not.toContain("جابه‌جایی ستون به چپ");
   });
 
   it("جابه‌جایی ستون‌ها: ورودی نامعتبر و بدون CSRF رد می‌شود", async () => {

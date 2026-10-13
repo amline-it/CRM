@@ -116,12 +116,12 @@ export async function createKanbanCardAction(_prev: ActionState, form: FormData)
 export async function reorderOrgUnitsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
     await assertCsrf(form);
-    await requirePermission("referral.manage");
+    const session = await requirePermission("referral.manage");
     const order = text(form, "order");
     if (!order) return { error: "ترتیب ستون‌ها مشخص نیست" };
     const keys = order.split(",").map((k) => k.trim()).filter(Boolean);
     if (!keys.length) return { error: "ترتیب ستون‌ها خالی است" };
-    Columns.saveDefaultColumnOrder(keys);
+    Columns.applyTeamColumnOrder(keys, session.staff.id);
     revalidatePath(KANBAN_REVALIDATE);
     return { message: "ترتیب ستون‌های کانبان ذخیره شد" };
   } catch (err) {

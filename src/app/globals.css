@@ -916,17 +916,3 @@ button:disabled {
   outline-offset: -2px;
   box-shadow: -6px 0 0 -2px var(--primary);
 }
-.col-shift { display: inline-flex; gap: 2px; }
-.col-shift-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1;
-  padding: 2px 6px;
-  cursor: pointer;
-}
-.col-shift-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.24); }
-.col-shift-btn:disabled { opacity: 0.35; cursor: default; }

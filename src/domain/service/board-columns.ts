@@ -133,6 +133,19 @@ export function saveDefaultColumnOrder(order: string[]): string[] {
   return applied.map((unit) => unit.key);
 }
 
+/**
+ * ثبت ترتیب پیش‌فرض تیم و همگام‌کردن دید خودِ مدیر با آن.
+ *
+ * چون چیدمان شخصی روی ترتیب پیش‌فرض سایه می‌اندازد، اگر مدیر چیدمان شخصی داشته باشد
+ * پس از «ثبت این ترتیب به‌عنوان پیش‌فرض همه» باید بلافاصله همان ترتیب مشترک را ببیند؛
+ * در غیر این صورت پیش‌فرض تازه برای خودش اعمال نمی‌شد (تله‌ای که تست سرتاسری گرفت).
+ */
+export function applyTeamColumnOrder(order: string[], actorStaffId: string | null | undefined): string[] {
+  const applied = saveDefaultColumnOrder(order);
+  if (actorStaffId) clearPersonalColumnOrder(actorStaffId);
+  return applied;
+}
+
 /** بازنشانی ترتیب پیش‌فرض به ترتیب ساخت واحدها (رفتار اولیه سامانه) */
 export function resetDefaultColumnOrder(): string[] {
   const units = [...Referrals.listOrgUnits()].sort((a, b) =>
