@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "@/auth/password";
 import { can, permissionsOf, assertCan } from "@/auth/rbac";
 import { signSessionToken, verifySessionToken, tokenHash } from "@/auth/jwt";
-import { createCsrfToken, safeEqual } from "@/auth/csrf";
+import { createCsrfToken, safeEqual, verifyCsrfToken } from "@/auth/csrf";
 
 process.env.SESSION_SECRET = "test-secret-at-least-32-chars-long!!";
 
@@ -80,5 +80,32 @@ describe("CSRF", () => {
     expect(safeEqual(a, b)).toBe(false);
     expect(safeEqual(a, null)).toBe(false);
     expect(safeEqual("", "")).toBe(false);
+  });
+
+  it("توکن امضاشده معتبر است و به کوکی نیاز ندارد", () => {
+    const token = createCsrfToken();
+    const result = verifyCsrfToken(token);
+    expect(result.ok).toBe(true);
+    expect(token.split(".")).toHaveLength(3);
+  });
+
+  it("توکن دست‌کاری‌شده رد می‌شود", () => {
+    const token = createCsrfToken();
+    const [nonce, issuedAt] = token.split(".");
+    const forged = `${nonce}.${issuedAt}.${Buffer.from("forged").toString("base64url")}`;
+    expect(verifyCsrfToken(forged).ok).toBe(false);
+    expect(verifyCsrfToken(forged).reason).toBe("bad_signature");
+    // تغییر زمان انتشار هم امضا را باطل می‌کند
+    const shifted = `${nonce}.${Number(issuedAt) + 1000}.${token.split(".")[2]}`;
+    expect(verifyCsrfToken(shifted).ok).toBe(false);
+  });
+
+  it("توکن منقضی، خالی و بدساختار رد می‌شوند", () => {
+    const old = createCsrfToken(Date.now() - 48 * 60 * 60 * 1000);
+    expect(verifyCsrfToken(old)).toEqual({ ok: false, reason: "expired" });
+    expect(verifyCsrfToken("")).toEqual({ ok: false, reason: "missing" });
+    expect(verifyCsrfToken(null)).toEqual({ ok: false, reason: "missing" });
+    expect(verifyCsrfToken("a.b")).toEqual({ ok: false, reason: "malformed" });
+    expect(verifyCsrfToken("a.b.c.d")).toEqual({ ok: false, reason: "malformed" });
   });
 });

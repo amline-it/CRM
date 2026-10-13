@@ -7,10 +7,12 @@ const initialState: LoginState = {};
 
 export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
+  // اگر اکشن توکن تازه برگرداند (مثلاً بعد از انقضا)، همان استفاده می‌شود
+  const token = state.csrf ?? csrf;
   if (ssoToken) {
     return (
       <form action={formAction}>
-        <input type="hidden" name="_csrf" value={csrf} />
+        <input type="hidden" name="_csrf" value={token} />
         <input type="hidden" name="sso_token" value={ssoToken} />
         <input type="hidden" name="username" value="" />
         <input type="hidden" name="password" value="" />
@@ -24,7 +26,7 @@ export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string 
   }
   return (
     <form action={formAction}>
-      <input type="hidden" name="_csrf" value={csrf} />
+      <input type="hidden" name="_csrf" value={token} />
       {state.error ? <div className="alert error">{state.error}</div> : null}
       <div className="field">
         <label htmlFor="username">نام کاربری</label>
@@ -44,9 +46,10 @@ export function LoginForm({ csrf, ssoToken }: { csrf: string; ssoToken?: string 
 
 export function BootstrapForm({ csrf }: { csrf: string }) {
   const [state, formAction, pending] = useActionState(bootstrapAdminAction, initialState);
+  const bootstrapToken = state.csrf ?? csrf;
   return (
     <form action={formAction}>
-      <input type="hidden" name="_csrf" value={csrf} />
+      <input type="hidden" name="_csrf" value={bootstrapToken} />
       <div className="alert info">
         هنوز هیچ کارمندی ثبت نشده است. ابتدا حساب مدیر را بسازید تا بتوانید وارد پنل شوید.
       </div>

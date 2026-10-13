@@ -8,7 +8,7 @@ import { AppError } from "@/lib/errors";
 import * as People from "@/db/repos/people";
 import * as Platform from "@/db/repos/platform";
 import { assertCan, can, type Permission, type Role } from "@/auth/rbac";
-import { CSRF_COOKIE, CSRF_FIELD, createCsrfToken, safeEqual } from "@/auth/csrf";
+import { CSRF_FIELD, createCsrfToken, verifyCsrfToken } from "@/auth/csrf";
 import { verifyPassword } from "@/auth/password";
 import { signSessionToken, tokenHash, verifySessionToken } from "@/auth/jwt";
 
@@ -50,13 +50,7 @@ export async function login(input: LoginInput): Promise<{ ok: true; session: Cur
   People.touchStaffLogin(staff.id);
 
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(expiresAt),
-  });
+  jar.set(SESSION_COOKIE, token, sessionCookieOptions(new Date(expiresAt)));
 
   Platform.writeAudit({
     actorType: staff.role,
@@ -114,30 +108,63 @@ export function assertPermission(session: CurrentSession, permission: Permission
 
 /* ── CSRF ─────────────────────────────────────────────────────────── */
 
-/** توکن CSRF فعلی برای قراردادن در فرم‌ها (خواندنی؛ مقدار در middleware ست می‌شود) */
+const CSRF_ERROR = "اعتبار فرم منقضی شده است؛ صفحه را دوباره بارگذاری کنید";
+
+/**
+ * توکن CSRF برای قرار دادن در فرم‌ها.
+ * بدون‌حالت است: در همان رندر ساخته می‌شود و نیازی به کوکی ندارد
+ * (پنل ممکن است داخل iframe یا دامنه‌ای متفاوت باز شود).
+ */
 export async function getCsrfToken(): Promise<string> {
-  const jar = await cookies();
-  return jar.get(CSRF_COOKIE)?.value ?? "";
+  return createCsrfToken();
 }
 
-/** برای مسیرهای API/اکشن‌ها: توکن تازه (در نبود کوکی) */
+/** توکن تازه — برای اکشن‌ها (مثلاً وقتی فرم باید خودش را تازه کند) */
 export function newCsrfToken(): string {
   return createCsrfToken();
 }
 
 export async function assertCsrf(formData: FormData | null): Promise<void> {
-  const jar = await cookies();
-  const expected = jar.get(CSRF_COOKIE)?.value ?? null;
   const provided = formData ? String(formData.get(CSRF_FIELD) ?? "") : null;
-  if (!safeEqual(expected, provided)) {
-    throw new AppError("FORBIDDEN", "اعتبار فرم منقضی شده است؛ صفحه را دوباره بارگذاری کنید");
-  }
+  const result = verifyCsrfToken(provided);
+  if (!result.ok) throw new AppError("FORBIDDEN", CSRF_ERROR);
 }
 
 export async function assertCsrfHeader(headerValue: string | null): Promise<void> {
-  const jar = await cookies();
-  const expected = jar.get(CSRF_COOKIE)?.value ?? null;
-  if (!safeEqual(expected, headerValue)) {
-    throw new AppError("FORBIDDEN", "توکن CSRF نامعتبر است");
-  }
+  const result = verifyCsrfToken(headerValue);
+  if (!result.ok) throw new AppError("FORBIDDEN", "توکن CSRF نامعتبر است");
+}
+
+/* ── تنظیمات کوکی جلسه ───────────────────────────────────────────── */
+
+/**
+ * گزینه‌های کوکی نشست.
+ * - تولید: SameSite=Lax (پیش‌فرض امن)
+ * - پیش‌نمایش/توسعه یا استقرار داخل iframe: با SESSION_COOKIE_SAMESITE=none
+ *   کوکی به None/Secure/Partitioned تبدیل می‌شود تا در iframe هم ارسال شود.
+ */
+export function sessionCookieOptions(expires?: Date): {
+  httpOnly: boolean;
+  sameSite: "lax" | "strict" | "none";
+  secure: boolean;
+  partitioned?: boolean;
+  path: string;
+  expires?: Date;
+} {
+  const configured = (process.env.SESSION_COOKIE_SAMESITE ?? "").toLowerCase();
+  const sameSite: "lax" | "strict" | "none" =
+    configured === "none" || configured === "strict" || configured === "lax"
+      ? (configured as "lax" | "strict" | "none")
+      : process.env.NODE_ENV === "production"
+        ? "lax"
+        : "none";
+  const secure = sameSite === "none" || process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    sameSite,
+    secure,
+    ...(sameSite === "none" ? { partitioned: true } : {}),
+    path: "/",
+    ...(expires ? { expires } : {}),
+  };
 }

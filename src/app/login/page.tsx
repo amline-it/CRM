@@ -1,7 +1,5 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentSession, SESSION_COOKIE } from "@/auth/session";
-import { CSRF_COOKIE } from "@/auth/csrf";
+import { getCurrentSession, newCsrfToken, SESSION_COOKIE } from "@/auth/session";
 import { ensureMigrated } from "@/db/migrate";
 import * as People from "@/db/repos/people";
 import { BootstrapForm, LoginForm } from "./login-form";
@@ -13,9 +11,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const session = await getCurrentSession();
   if (session) redirect("/panel");
 
-  // توکن CSRF توسط middleware روی پاسخ ست می‌شود؛ اینجا فقط خوانده می‌شود
-  const jar = await cookies();
-  const csrf = jar.get(CSRF_COOKIE)?.value ?? "";
+  // توکن CSRF امضاشده و بدون‌حالت است؛ در همین رندر ساخته می‌شود (بدون نیاز به کوکی)
+  const csrf = newCsrfToken();
 
   const params = await searchParams;
   const ssoToken = typeof params.sso === "string" && params.sso ? params.sso : undefined;
