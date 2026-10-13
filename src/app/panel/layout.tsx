@@ -7,6 +7,7 @@ import * as Catalog from "@/db/repos/catalog";
 import { STAFF_ROLE_LABELS } from "@/lib/fa-labels";
 import { faNumber } from "@/lib/money";
 import { LogoutButton } from "@/components/session-bridge";
+import { demoModeEnabled } from "@/auth/demo";
 import { SideNav, type NavGroup } from "./nav";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   ensureMigrated();
   const session = await requireSession();
   const { role } = session;
+  // فقط در پیش‌نمایش محلی فعال می‌شود (روی سرور واقعی خاموش است)
+  const demo = demoModeEnabled();
 
   const openCases = Cases.countOpenCases();
   const openTasks = Cases.countOpenTasks();
@@ -73,7 +76,17 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <span>
               {session.staff.full_name} · {STAFF_ROLE_LABELS[session.staff.role] ?? session.staff.role}
             </span>
-            <LogoutButton />
+            {demo ? (
+              <span
+                className="badge"
+                title="این حالت فقط روی پیش‌نمایش محلی فعال است و روی سرور واقعی وجود ندارد"
+                style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" }}
+              >
+                حالت نمایش محلی · ورود غیرفعال
+              </span>
+            ) : (
+              <LogoutButton />
+            )}
           </div>
         </header>
         <main className="content">{children}</main>

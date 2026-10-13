@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentSession, newCsrfToken, SESSION_COOKIE } from "@/auth/session";
 import { ensureMigrated } from "@/db/migrate";
 import * as People from "@/db/repos/people";
+import { demoModeEnabled } from "@/auth/demo";
 import { BootstrapForm, LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   ensureMigrated();
   const session = await getCurrentSession();
   if (session) redirect("/panel");
+  // در حالت نمایش محلی (فقط پیش‌نمایش)، صفحه ورود غیرفعال است و مستقیم به پنل می‌رویم
+  if (demoModeEnabled()) redirect("/panel");
 
   // توکن CSRF امضاشده و بدون‌حالت است؛ در همین رندر ساخته می‌شود (بدون نیاز به کوکی)
   const csrf = newCsrfToken();

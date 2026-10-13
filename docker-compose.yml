@@ -22,6 +22,8 @@ services:
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-sandbox}
       TRACKING_PROVIDER: ${TRACKING_PROVIDER:-manual}
       NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-log}
+      # روی سرور واقعی همیشه خاموش است (حالت نمایش فقط برای ماشین توسعه)
+      LOCAL_DEMO_MODE: "false"
       TZ: Asia/Tehran
     volumes:
       - crm-data:/data

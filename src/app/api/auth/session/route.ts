@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, sessionFromToken, ticketFromHeaders } from "@/auth/session";
+import { SESSION_COOKIE, getCurrentSession, sessionFromToken, ticketFromHeaders } from "@/auth/session";
 import { ensureMigrated } from "@/db/migrate";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,9 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   ensureMigrated();
   const ticket = ticketFromHeaders(request.headers) ?? request.cookies.get(SESSION_COOKIE)?.value ?? null;
-  const session = await sessionFromToken(ticket);
+  // اگر توکنی نبود/نامعتبر بود، از منطق مشترک نشست استفاده می‌کنیم
+  // (کوکی، توکن هدر و در حالت نمایش محلی، نشست نمایشی)
+  const session = (await sessionFromToken(ticket)) ?? (await getCurrentSession());
   if (!session) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }

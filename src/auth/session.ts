@@ -12,6 +12,7 @@ import { CSRF_FIELD, createCsrfToken, verifyCsrfToken } from "@/auth/csrf";
 import { verifyPassword } from "@/auth/password";
 import { signSessionToken, tokenHash, verifySessionToken } from "@/auth/jwt";
 import { headerSessionEnabled, ticketFromHeaders, SESSION_TICKET_HEADER, SESSION_AUTH_HEADER } from "@/auth/ticket";
+import { demoModeEnabled, DEMO_SESSION_ID } from "@/auth/demo";
 
 export const SESSION_COOKIE = "crm_session";
 
@@ -108,9 +109,34 @@ export async function getCurrentSession(): Promise<CurrentSession | null> {
   const jar = await cookies();
   const fromCookie = await sessionFromToken(jar.get(SESSION_COOKIE)?.value);
   if (fromCookie) return fromCookie;
-  if (!headerSessionEnabled()) return null;
+  if (!headerSessionEnabled()) return demoSession();
   const headerList = await headers();
-  return sessionFromToken(ticketFromHeaders(headerList));
+  const fromHeader = await sessionFromToken(ticketFromHeaders(headerList));
+  return fromHeader ?? demoSession();
+}
+
+/**
+ * نشست نمایشی برای حالت LOCAL_DEMO_MODE (فقط پیش‌نمایش محلی).
+ * یک نشست ساختگی با نقش مدیر می‌سازد و ردیفی در دیتابیس ایجاد نمی‌کند.
+ */
+function demoSession(): CurrentSession | null {
+  if (!demoModeEnabled()) return null;
+  try {
+    const staffList = People.listStaff();
+    const staff =
+      staffList.find((item) => item.active !== 0 && item.role === "admin") ??
+      staffList.find((item) => item.active !== 0) ??
+      null;
+    if (!staff) return null;
+    return {
+      staff,
+      role: staff.role as Role,
+      sessionId: DEMO_SESSION_ID,
+      expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** نیازمند ورود — در غیر این صورت به صفحه ورود هدایت می‌شود */

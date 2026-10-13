@@ -1,12 +1,13 @@
 /**
  * تست‌های احراز هویت: هش رمز، توکن جلسه، RBAC و توکن CSRF.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "@/auth/password";
 import { can, permissionsOf, assertCan } from "@/auth/rbac";
 import { signSessionToken, verifySessionToken, tokenHash } from "@/auth/jwt";
 import { createCsrfToken, safeEqual, verifyCsrfToken } from "@/auth/csrf";
 import { headerSessionEnabled, ticketFromHeaders } from "@/auth/ticket";
+import { demoModeEnabled } from "@/auth/demo";
 
 process.env.SESSION_SECRET = "test-secret-at-least-32-chars-long!!";
 
@@ -138,5 +139,34 @@ describe("توکن نشست از هدر (مسیر بدون کوکی)", () => {
     expect(headerSessionEnabled()).toBe(true);
     if (previous === undefined) delete process.env.ALLOW_HEADER_SESSION;
     else process.env.ALLOW_HEADER_SESSION = previous;
+  });
+});
+
+describe("حالت نمایش محلی (LOCAL_DEMO_MODE)", () => {
+  const original = process.env.LOCAL_DEMO_MODE;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.LOCAL_DEMO_MODE;
+    else process.env.LOCAL_DEMO_MODE = original;
+  });
+
+  it("پیش‌فرض خاموش است", () => {
+    delete process.env.LOCAL_DEMO_MODE;
+    expect(demoModeEnabled()).toBe(false);
+  });
+
+  it("فقط مقدار دقیق true آن را روشن می‌کند", () => {
+    process.env.LOCAL_DEMO_MODE = "true";
+    expect(demoModeEnabled()).toBe(true);
+    process.env.LOCAL_DEMO_MODE = "TRUE";
+    expect(demoModeEnabled()).toBe(true);
+    process.env.LOCAL_DEMO_MODE = "1";
+    expect(demoModeEnabled()).toBe(false);
+    process.env.LOCAL_DEMO_MODE = "yes";
+    expect(demoModeEnabled()).toBe(false);
+    process.env.LOCAL_DEMO_MODE = "false";
+    expect(demoModeEnabled()).toBe(false);
+    process.env.LOCAL_DEMO_MODE = "";
+    expect(demoModeEnabled()).toBe(false);
   });
 });
