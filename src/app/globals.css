@@ -1,0 +1,606 @@
+/* ── CRM املاک — استایل سراسری RTL ─────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap");
+
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e3e8ef;
+  --text: #182230;
+  --text-muted: #5b6b7f;
+  --primary: #1c5bd8;
+  --primary-soft: #e8effd;
+  --primary-dark: #14449f;
+  --success: #12805c;
+  --success-soft: #e3f6ee;
+  --warning: #a86400;
+  --warning-soft: #fdf3e0;
+  --danger: #c0322b;
+  --danger-soft: #fdeceb;
+  --info: #0d6a91;
+  --info-soft: #e4f3f9;
+  --sidebar: #10203a;
+  --sidebar-soft: #1b3057;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(16, 32, 58, 0.06), 0 4px 16px rgba(16, 32, 58, 0.06);
+  --font: "Vazirmatn", Tahoma, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  direction: rtl;
+  text-align: right;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── چیدمان ────────────────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 244px;
+  background: var(--sidebar);
+  color: #dbe4f3;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 16px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  color: #dbe4f3;
+  font-size: 13.5px;
+}
+
+.sidebar nav a:hover {
+  background: var(--sidebar-soft);
+  text-decoration: none;
+}
+
+.sidebar nav a.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sidebar .section-title {
+  font-size: 11px;
+  color: #8fa4c4;
+  padding: 14px 12px 4px;
+  letter-spacing: 0.02em;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.topbar .title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.topbar .user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.content {
+  padding: 20px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── کارت و شبکه ───────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+}
+
+.card > h2,
+.card > h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.grid-4 {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+
+.stat .label {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat .value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.stat .hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── جدول ──────────────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12.5px;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 28px 12px;
+}
+
+/* ── نشان‌ها ───────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.9;
+  white-space: nowrap;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.badge.success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge.warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.badge.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.badge.muted {
+  background: #eef1f6;
+  color: var(--text-muted);
+}
+
+/* ── فرم ──────────────────────────────────────────────────────────── */
+
+label {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.form-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+button,
+.btn {
+  font-family: var(--font);
+  font-size: 13.5px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+button:hover,
+.btn:hover {
+  background: var(--primary-dark);
+  text-decoration: none;
+}
+
+button.secondary,
+.btn.secondary {
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+button.secondary:hover,
+.btn.secondary:hover {
+  background: var(--surface-2);
+}
+
+button.danger {
+  background: var(--danger);
+}
+
+button.success {
+  background: var(--success);
+}
+
+button.small,
+.btn.small {
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.inline-form {
+  display: inline;
+}
+
+.actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── تایم‌لاین ─────────────────────────────────────────────────────── */
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.timeline li {
+  position: relative;
+  padding: 0 18px 16px 0;
+  border-right: 2px solid var(--border);
+  margin-right: 6px;
+}
+
+.timeline li::before {
+  content: "";
+  position: absolute;
+  right: -7px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.timeline .t-title {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.timeline .t-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.timeline li.external::before {
+  background: var(--success);
+  box-shadow: 0 0 0 2px var(--success-soft);
+}
+
+/* ── صفحه ورود ────────────────────────────────────────────────────── */
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #10203a 0%, #1c5bd8 130%);
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 390px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 26px;
+  box-shadow: 0 24px 60px rgba(8, 20, 40, 0.35);
+}
+
+.login-card h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.login-card p.sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 20px;
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.alert.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.alert.success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.alert.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.alert.warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+/* ── ریزجزئیات ────────────────────────────────────────────────────── */
+
+.kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 18px;
+}
+
+.kv .k {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.kv .v {
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 12.5px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  direction: ltr;
+  display: inline-block;
+}
+
+.flex {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: end;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.tabs a {
+  padding: 7px 12px;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.tabs a.active {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+  .content {
+    padding: 14px;
+  }
+}

@@ -106,6 +106,16 @@ export function upsertService(input: {
   return id;
 }
 
+/** فقط روشن/خاموش کردن خدمت بدون دست‌زدن به سایر فیلدها */
+export function setServiceActive(key: string, active: boolean): void {
+  run("UPDATE services SET active = ?, updated_at = ? WHERE key = ?", [active ? 1 : 0, nowIso(), key]);
+}
+
+/** فهرست کلیدهای خدمت که به یک گردش‌کار متصل‌اند */
+export function listServicesByWorkflow(workflowKey: string): ServiceRow[] {
+  return all<ServiceRow>("SELECT * FROM services WHERE workflow_key = ? ORDER BY sort_order, name", [workflowKey]);
+}
+
 export function serviceRequiredDocuments(key: string): string[] {
   const service = getServiceByKey(key);
   return jsonParse<string[]>(service?.required_documents, []);

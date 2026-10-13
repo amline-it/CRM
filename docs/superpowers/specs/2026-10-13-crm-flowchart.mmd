@@ -1,0 +1,162 @@
+---
+title: نمودار گردش‌کار CRM املاک (تولیدشده از workflow-definitions/*.json)
+---
+flowchart TD
+  classDef start fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef terminal fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef decision fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef errorState fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+
+  subgraph SG_contract["فرایند قرارداد"]
+    direction TB
+    contract_start["شروع پرونده قرارداد<br/><span style='font-size:10px'>contract_start</span>"]:::start
+    rent_info["ثبت اطلاعات اجاره<br/><span style='font-size:10px'>rent_info</span>"]
+    sale_info["ثبت اطلاعات خرید و فروش<br/><span style='font-size:10px'>sale_info</span>"]
+    output_choice["تعیین خروجی موردنیاز<br/><span style='font-size:10px'>output_choice</span>"]:::decision
+    no_tracking["بدون کد رهگیری<br/><span style='font-size:10px'>no_tracking</span>"]
+    with_tracking["با درخواست کد رهگیری<br/><span style='font-size:10px'>with_tracking</span>"]
+    case_created["تشکیل پرونده خدمت<br/><span style='font-size:10px'>case_created</span>"]
+    finance_check["بررسی شرایط مالی مختص همین خدمت<br/><span style='font-size:10px'>finance_check</span>"]:::decision
+    payment_direct["پرداخت مستقیم<br/><span style='font-size:10px'>payment_direct</span>"]:::decision
+    subscription_check["اشتراک برای این خدمت معتبر است؟<br/><span style='font-size:10px'>subscription_check</span>"]:::decision
+    referral_check["شرایط ریفرال یا معافیت تأیید شده است؟<br/><span style='font-size:10px'>referral_check</span>"]:::decision
+    payment_error["ثبت خطا و پیگیری پرداخت<br/><span style='font-size:10px'>payment_error</span>"]:::errorState
+    finance_ok["تأیید وضعیت مالی<br/><span style='font-size:10px'>finance_ok</span>"]
+    documents_review["بررسی مدارک قرارداد<br/><span style='font-size:10px'>documents_review</span>"]:::decision
+    documents_incomplete["اعلام مدارک موردنیاز<br/><span style='font-size:10px'>documents_incomplete</span>"]:::errorState
+    documents_rejected["اعلام دلیل رد و درخواست اصلاح<br/><span style='font-size:10px'>documents_rejected</span>"]:::errorState
+    documents_pending_queue["صف بررسی کارشناس<br/><span style='font-size:10px'>documents_pending_queue</span>"]
+    sale_branch["نوع قرارداد خرید و فروش است؟<br/><span style='font-size:10px'>sale_branch</span>"]:::decision
+    legal_review["بررسی حقوقی<br/><span style='font-size:10px'>legal_review</span>"]
+    legal_result["نتیجه بررسی حقوقی<br/><span style='font-size:10px'>legal_result</span>"]:::decision
+    clause_edit["اصلاح بندهای قرارداد<br/><span style='font-size:10px'>clause_edit</span>"]
+    contract_rejected["ثبت رد و دلیل آن<br/><span style='font-size:10px'>contract_rejected</span>"]:::terminal
+    clause_edit_decision["نیاز به ویرایش بند دارد؟<br/><span style='font-size:10px'>clause_edit_decision</span>"]:::decision
+    signature_prep["آماده‌سازی برای امضا<br/><span style='font-size:10px'>signature_prep</span>"]
+    signature_collect["ارسال و پیگیری امضای طرفین<br/><span style='font-size:10px'>signature_collect</span>"]
+    signature_check["امضاهای لازم کامل و معتبرند؟<br/><span style='font-size:10px'>signature_check</span>"]:::decision
+    signature_followup["پیگیری امضاهای باقی‌مانده<br/><span style='font-size:10px'>signature_followup</span>"]:::errorState
+    tracking_decision["کد رهگیری درخواست شده است؟<br/><span style='font-size:10px'>tracking_decision</span>"]:::decision
+    contract_done_no_tracking["اتمام قرارداد با امضا، بدون کد رهگیری<br/><span style='font-size:10px'>contract_done_no_tracking</span>"]
+    tracking_request["ارسال درخواست کد رهگیری<br/><span style='font-size:10px'>tracking_request</span>"]
+    tracking_check["کد رهگیری دریافت شده؟<br/><span style='font-size:10px'>tracking_check</span>"]:::decision
+    tracking_error["ثبت خطا و پیگیری رفع مشکل<br/><span style='font-size:10px'>tracking_error</span>"]:::errorState
+    contract_done_with_tracking["ثبت کد رهگیری و اتمام قرارداد<br/><span style='font-size:10px'>contract_done_with_tracking</span>"]
+    contract_start ==>|"◆ اجاره"| rent_info
+    contract_start ==>|"◆ خرید و فروش"| sale_info
+    rent_info -->|"▶ ثبت اطلاعات اجاره"| output_choice
+    sale_info -->|"▶ ثبت اطلاعات خرید و فروش"| output_choice
+    output_choice ==>|"◆ فقط امضا"| no_tracking
+    output_choice ==>|"◆ امضا و کد رهگیری"| with_tracking
+    no_tracking & with_tracking -->|"⚙ تشکیل پرونده خدمت"| case_created
+    case_created -->|"⚙ ورود به بررسی شرایط مالی"| finance_check
+    finance_check ==>|"◆ پرداخت مستقیم"| payment_direct
+    finance_check ==>|"◆ اشتراک"| subscription_check
+    finance_check ==>|"◆ ریفرال یا معافیت"| referral_check
+    finance_check ==>|"◆ بدون نیاز به پرداخت"| finance_ok
+    payment_direct & payment_error & subscription_check & referral_check -->|"⚙ پرداخت موفق"| finance_ok
+    payment_direct & subscription_check & referral_check -->|"⚙ ثبت خطا و پیگیری پرداخت"| payment_error
+    payment_error -->|"▶ تلاش مجدد پرداخت"| payment_direct
+    payment_error -->|"▶ انصراف از پرداخت و بستن پرونده"| contract_rejected
+    subscription_check -->|"⚙ اشتراک معتبر است"| finance_ok
+    subscription_check -->|"▶ اشتراک معتبر نیست — هدایت به پرداخت مستقیم"| payment_direct
+    referral_check -->|"▶ ریفرال یا معافیت تأیید شد"| finance_ok
+    referral_check -->|"▶ ریفرال یا معافیت تأیید نشد — هدایت به پرداخت مستقیم"| payment_direct
+    finance_ok -->|"⚙ بررسی مدارک قرارداد"| documents_review
+    documents_review -->|"▶ اعلام مدارک موردنیاز"| documents_incomplete
+    documents_review -->|"▶ اعلام دلیل رد و درخواست اصلاح"| documents_rejected
+    documents_incomplete & documents_rejected -->|"▶ بارگذاری یا اصلاح مدارک"| documents_review
+    documents_review -->|"▶ ارسال به صف بررسی کارشناس"| documents_pending_queue
+    documents_pending_queue -->|"▶ ثبت نتیجه بررسی مدارک توسط کارشناس"| documents_review
+    documents_review -->|"▶ تأیید همه مدارک"| sale_branch
+    sale_branch -->|"⚙ خرید و فروش — بررسی حقوقی"| legal_review
+    sale_branch -->|"⚙ اجاره — تصمیم ویرایش بند"| clause_edit_decision
+    clause_edit_decision ==>|"◆ بله — ارجاع به بررسی حقوقی"| legal_review
+    clause_edit_decision ==>|"◆ خیر — آماده‌سازی امضا"| signature_prep
+    legal_review -->|"⚙ آماده ثبت نتیجه بررسی حقوقی"| legal_result
+    legal_result -->|"▶ تأیید بررسی حقوقی"| signature_prep
+    legal_result -->|"▶ نیاز به اصلاح بند"| clause_edit
+    legal_result -->|"▶ رد قرارداد در بررسی حقوقی"| contract_rejected
+    clause_edit -->|"▶ اصلاح بندهای قرارداد"| legal_review
+    signature_prep -->|"▶ ارسال و پیگیری امضای طرفین"| signature_collect
+    signature_collect & signature_followup -->|"▶ بررسی وضعیت امضاها"| signature_check
+    signature_check -->|"⚙ پیگیری امضاهای باقی‌مانده"| signature_followup
+    signature_check -->|"⚙ همه امضاها کامل و معتبر"| tracking_decision
+    tracking_decision -->|"⚙ اتمام قرارداد بدون کد رهگیری"| contract_done_no_tracking
+    tracking_decision -->|"⚙ ارسال درخواست کد رهگیری"| tracking_request
+    tracking_request -->|"⚙ تلاش مجدد برای کد رهگیری"| tracking_check
+    tracking_check -->|"▶ کد رهگیری دریافت شد"| contract_done_with_tracking
+    tracking_check -->|"▶ ثبت خطا و پیگیری رفع مشکل"| tracking_error
+    tracking_error -->|"▶ تلاش مجدد برای دریافت کد رهگیری"| tracking_request
+    tracking_error -->|"▶ انصراف از کد رهگیری و بستن پرونده"| contract_rejected
+  end
+
+  subgraph SG_custom_service["قالب سایر خدمات"]
+    direction TB
+    service_start["شروع خدمت<br/><span style='font-size:10px'>service_start</span>"]:::start
+    service_details["تکمیل اطلاعات و مدارک خدمت<br/><span style='font-size:10px'>service_details</span>"]
+    service_finance["بررسی شرایط مالی خدمت<br/><span style='font-size:10px'>service_finance</span>"]:::decision
+    service_finance_error["خطای مالی و پیگیری<br/><span style='font-size:10px'>service_finance_error</span>"]:::errorState
+    service_execution["اجرای مراحل اختصاصی خدمت<br/><span style='font-size:10px'>service_execution</span>"]
+    service_review["بررسی و تأیید نتیجه<br/><span style='font-size:10px'>service_review</span>"]
+    service_needs_fix["اعلام نقص و درخواست اصلاح<br/><span style='font-size:10px'>service_needs_fix</span>"]:::errorState
+    service_delivered["تحویل نتیجه خدمت<br/><span style='font-size:10px'>service_delivered</span>"]
+    service_cancelled["لغو خدمت<br/><span style='font-size:10px'>service_cancelled</span>"]
+    service_start -->|"▶ تکمیل اطلاعات و مدارک خدمت"| service_details
+    service_details -->|"▶ بررسی شرایط مالی خدمت"| service_finance
+    service_finance & service_finance_error -->|"▶ تأیید شرایط مالی خدمت"| service_execution
+    service_finance -->|"▶ ثبت خطای مالی و پیگیری"| service_finance_error
+    service_execution -->|"▶ اعلام نتیجه اجرای خدمت"| service_review
+    service_review -->|"▶ تأیید نتیجه خدمت و تحویل"| service_delivered
+    service_review -->|"▶ اعلام نقص و درخواست اصلاح"| service_needs_fix
+    service_needs_fix -->|"▶ اصلاح و اجرای مجدد"| service_execution
+    service_details & service_finance & service_finance_error & service_execution & service_review & service_needs_fix -->|"▶ لغو خدمت"| service_cancelled
+  end
+
+  subgraph SG_listing["فرایند آگهی"]
+    direction TB
+    listing_start["شروع فرایند ثبت آگهی<br/><span style='font-size:10px'>listing_start</span>"]:::start
+    listing_finance["بررسی شرایط مالی مختص آگهی<br/><span style='font-size:10px'>listing_finance</span>"]
+    listing_info["تکمیل اطلاعات و مدارک آگهی<br/><span style='font-size:10px'>listing_info</span>"]
+    listing_review["بررسی آگهی توسط کارشناس<br/><span style='font-size:10px'>listing_review</span>"]
+    listing_result["نتیجه بررسی آگهی<br/><span style='font-size:10px'>listing_result</span>"]:::decision
+    listing_needs_fix["اعلام نقص یا علت رد<br/><span style='font-size:10px'>listing_needs_fix</span>"]:::errorState
+    listing_published["انتشار و مدیریت وضعیت آگهی<br/><span style='font-size:10px'>listing_published</span>"]
+    listing_paused["توقف موقت انتشار<br/><span style='font-size:10px'>listing_paused</span>"]
+    listing_expired["انقضای آگهی<br/><span style='font-size:10px'>listing_expired</span>"]
+    listing_closed["بسته‌شدن آگهی<br/><span style='font-size:10px'>listing_closed</span>"]
+    listing_start -->|"⚙ بررسی شرایط مالی آگهی"| listing_finance
+    listing_finance -->|"▶ تأیید شرایط مالی (پرداخت، اشتراک یا معافیت)"| listing_info
+    listing_info -->|"▶ تکمیل اطلاعات و مدارک آگهی"| listing_review
+    listing_review -->|"▶ ثبت نتیجه بررسی کارشناس"| listing_result
+    listing_result -->|"▶ اعلام نقص یا علت رد"| listing_needs_fix
+    listing_needs_fix -->|"▶ اصلاح و ارسال مجدد آگهی"| listing_info
+    listing_result -->|"▶ انتشار آگهی"| listing_published
+    listing_published -->|"▶ توقف موقت انتشار"| listing_paused
+    listing_paused -->|"▶ انتشار مجدد"| listing_published
+    listing_published & listing_paused -->|"⚙ انقضای آگهی"| listing_expired
+    listing_published & listing_paused -->|"▶ بستن آگهی (معامله انجام شد یا لغو)"| listing_closed
+  end
+
+  subgraph SG_requirements["فرایند نیازمندی‌ها"]
+    direction TB
+    requirements_start["ثبت نیازمندی<br/><span style='font-size:10px'>requirements_start</span>"]:::start
+    requirements_visible["نمایش نیازمندی‌ها طبق دسترسی<br/><span style='font-size:10px'>requirements_visible</span>"]
+    requirements_matching["تطبیق با آگهی‌های موجود<br/><span style='font-size:10px'>requirements_matching</span>"]
+    requirements_matched["ارائه پیشنهادها<br/><span style='font-size:10px'>requirements_matched</span>"]
+    requirements_fulfilled["نیازمندی تأمین شد<br/><span style='font-size:10px'>requirements_fulfilled</span>"]
+    requirements_expired["انقضای نیازمندی<br/><span style='font-size:10px'>requirements_expired</span>"]
+    requirements_cancelled["لغو توسط متقاضی<br/><span style='font-size:10px'>requirements_cancelled</span>"]
+    requirements_start ==>|"◆ عمومی"| requirements_visible
+    requirements_start ==>|"◆ فقط مشاوران املاک"| requirements_visible
+    requirements_start ==>|"◆ فقط کارکنان CRM"| requirements_visible
+    requirements_visible -->|"▶ تطبیق با آگهی‌ها"| requirements_matching
+    requirements_matching -->|"▶ ارائه پیشنهادهای تطبیق‌یافته"| requirements_matched
+    requirements_matched -->|"▶ بازگشت به نمایش عمومی"| requirements_visible
+    requirements_matched -->|"▶ تأمین نیازمندی"| requirements_fulfilled
+    requirements_visible & requirements_matched -->|"⚙ انقضای نیازمندی"| requirements_expired
+    requirements_visible & requirements_matched -->|"▶ لغو توسط متقاضی"| requirements_cancelled
+  end
+
+  %% راهنما: ▶ گذار کاربری (action) · ◆ گذار انتخابی (choice) · ⚙ گذار خودکار موتور (auto)
+  %% رنگ‌ها: آبی=شروع · سبز=پایان · زرد=تصمیم · قرمز=مسیر خطا

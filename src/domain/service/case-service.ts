@@ -805,7 +805,11 @@ export function saveContractDetails(caseId: string, input: Record<string, unknow
   });
 }
 
-export function caseDetail(caseId: string) {
+/**
+ * گزارش کامل پرونده برای پنل.
+ * اگر actor داده شود، فهرست گذارهای مجاز به‌صورت آرایه سریال‌پذیر هم برگردانده می‌شود.
+ */
+export function caseDetail(caseId: string, actor?: ActorContext) {
   const row = Cases.findCaseById(caseId);
   if (!row) throw new AppError("NOT_FOUND", "پرونده یافت نشد");
   const runtime = loadRuntime(caseId);
@@ -832,7 +836,8 @@ export function caseDetail(caseId: string) {
     owner: row.owner_user_id ? People.findUserById(row.owner_user_id) : null,
     agent: row.agent_user_id ? People.findUserById(row.agent_user_id) : null,
     assignedStaff: row.assigned_staff_id ? People.findStaffById(row.assigned_staff_id) : null,
-    availableTransitions: (actor: ActorContext) => engine.available(runtime, actor),
+    available: actor ? engine.available(runtime, actor) : [],
+    availableTransitions: (forActor: ActorContext) => engine.available(runtime, forActor),
   };
 }
 

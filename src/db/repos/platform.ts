@@ -347,6 +347,23 @@ export function listWebhooks(limit = 100): WebhookRow[] {
   return all<WebhookRow>("SELECT * FROM outbound_webhooks ORDER BY created_at DESC LIMIT ?", [limit]);
 }
 
+/** بازگشت وب‌هوک مرده به صف برای تلاش دوباره (attempts صفر می‌شود) */
+export function retryWebhook(id: string): void {
+  const now = nowIso();
+  run(
+    "UPDATE outbound_webhooks SET status = 'pending', attempts = 0, next_attempt_at = ?, last_error = NULL, updated_at = ? WHERE id = ?",
+    [now, now, id],
+  );
+}
+
+/** حذف رکوردهای وب‌هوک (برای پاک‌سازی موارد مرده/قدیمی) */
+export function deleteWebhooks(ids: string[]): number {
+  if (!ids.length) return 0;
+  const placeholders = ids.map(() => "?").join(", ");
+  run(`DELETE FROM outbound_webhooks WHERE id IN (${placeholders})`, ids);
+  return ids.length;
+}
+
 /* ── Idempotency ─────────────────────────────────────────────────── */
 
 export function getIdempotentResponse(key: string): { status: number; response: string | null } | null {

@@ -1,0 +1,35 @@
+# ── اجرای CRM روی سرور کاربر با داکر ───────────────────────────────────
+services:
+  crm:
+    build: .
+    image: crm-realestate:latest
+    container_name: crm-realestate
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET الزامی است}
+      SYNC_API_KEY: ${SYNC_API_KEY:-}
+      SYNC_SECRET: ${SYNC_SECRET:-}
+      SYNC_PULL_ENABLED: ${SYNC_PULL_ENABLED:-false}
+      SYNC_PULL_URL: ${SYNC_PULL_URL:-}
+      SYNC_PULL_API_KEY: ${SYNC_PULL_API_KEY:-}
+      WEBHOOK_TARGET_URL: ${WEBHOOK_TARGET_URL:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      SSO_ENABLED: ${SSO_ENABLED:-false}
+      SSO_JWT_SECRET: ${SSO_JWT_SECRET:-}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-sandbox}
+      TRACKING_PROVIDER: ${TRACKING_PROVIDER:-manual}
+      NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-log}
+      TZ: Asia/Tehran
+    volumes:
+      - crm-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  crm-data:

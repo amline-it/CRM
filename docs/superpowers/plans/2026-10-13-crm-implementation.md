@@ -20,25 +20,25 @@
 
 ## فاز ۰ — اسکلت و ابزارها
 
-- [ ] 0.1 `package.json` (اسکریپت‌های dev/build/test/seed/migrate/e2e)، `tsconfig.json`، `next.config.ts`، `vitest.config.ts`، `.gitignore`، `.env.example`
+- [x] 0.1 `package.json` (اسکریپت‌های dev/build/test/seed/migrate/e2e)، `tsconfig.json`، `next.config.ts`، `vitest.config.ts`، `.gitignore`، `.env.example`
 - [ ] 0.2 `src/lib/*` (jalali، پول، خطاهای ساخت‌یافته، کلیدهای فارسی) + تست‌ها
-- [ ] 0.3 `src/db/client.ts` (node:sqlite + WAL + FK) و `src/db/migrate.ts` + `migrations/0001_init.sql` شامل **همه** جداول طراحی (بند ۷) + ایندکس‌های یکتایی idempotency
+- [x] 0.3 `src/db/client.ts` (node:sqlite + WAL + FK) و `src/db/migrate.ts` + `migrations/0001_init.sql` شامل **همه** جداول طراحی (بند ۷) + ایندکس‌های یکتایی idempotency
 
 ## فاز ۱ — موتور گردش‌کار (هسته، TDD)
 
-- [ ] 1.1 `src/domain/engine/types.ts` — نوع تعریف/گذار/گارد/افکت/کانتکست
-- [ ] 1.2 `src/domain/engine/validate.ts` — اعتبارسنجی تعریف: یکتایی کلید، وجود from/to، گره‌های بی‌خروج، گارد/افکت شناخته‌شده، `options.to` موجود → تست برای هر خطا
-- [ ] 1.3 `src/domain/engine/engine.ts` — `availableTransitions`، `apply`، خطاهای ساخت‌یافته (GuardFailed با کد فارسی)، شمارش تلاش، قفل نسخه تعریف روی پرونده
-- [ ] 1.4 تست: هر ۴ تعریف JSON معتبر؛ آزمایش هر گذار مجاز/غیرمجاز روی `contract`
-- [ ] 1.5 `src/domain/guards/index.ts` — پیاده‌سازی همه گاردهای نام‌برده (بند ۸ سند) + تست برای هر گارد (مثبت/منفی)
-- [ ] 1.6 `src/domain/effects/index.ts` — همه افکت‌ها (رویداد، وظیفه، اعلان، انتشار، بستن، تولید سند، درخواست کد، مصرف ریفرال، شمارنده) + تست
-- [ ] 1.7 سناریوهای سرتاسری موتور (بند ۱۱ سند: ۱ تا ۷) به‌صورت تست اجرای کامل روی دیتابیس موقت
+- [x] 1.1 `src/domain/engine/types.ts` — نوع تعریف/گذار/گارد/افکت/کانتکست
+- [x] 1.2 `src/domain/engine/validate.ts` — اعتبارسنجی تعریف: یکتایی کلید، وجود from/to، گره‌های بی‌خروج، گارد/افکت شناخته‌شده، `options.to` موجود → تست برای هر خطا
+- [x] 1.3 `src/domain/engine/engine.ts` — `availableTransitions`، `apply`، خطاهای ساخت‌یافته (GuardFailed با کد فارسی)، شمارش تلاش، قفل نسخه تعریف روی پرونده
+- [x] 1.4 تست: هر ۴ تعریف JSON معتبر؛ آزمایش هر گذار مجاز/غیرمجاز روی `contract`
+- [x] 1.5 `src/domain/guards/index.ts` — پیاده‌سازی همه گاردهای نام‌برده (بند ۸ سند) + تست برای هر گارد (مثبت/منفی)
+- [x] 1.6 `src/domain/effects/index.ts` — همه افکت‌ها (رویداد، وظیفه، اعلان، انتشار، بستن، تولید سند، درخواست کد، مصرف ریفرال، شمارنده) + تست
+- [x] 1.7 سناریوهای سرتاسری موتور (بند ۱۱ سند: ۱ تا ۷) به‌صورت تست اجرای کامل روی دیتابیس موقت — ۶۲ تست سبز (commit 555da75)
 
 ## فاز ۲ — لایه داده و سرویس‌های دامنه
 
-- [ ] 2.1 ریپازیتوری‌ها: users، services، cases، transitions، timeline، tasks، documents، contractDetail، listing، requirement، finance (invoice/payment/subscription/referral)، notifications، audit، syncLog، workflows، staff
-- [ ] 2.2 `case-service.ts` — تشکیل پرونده، ارجاع، صف کارشناس، بستن
-- [ ] 2.3 آداپتورها: `payment` (sandbox موفق/ناموفق/تایم‌اوت)، `tracking` (صف + ثبت کارشناس)، `notification` (log) + تست
+- [x] 2.1 ریپازیتوری‌ها: users، services، cases، transitions، timeline، tasks، documents، contractDetail، listing، requirement، finance (invoice/payment/subscription/referral)، notifications، audit، syncLog، workflows، staff
+- [x] 2.2 `case-service.ts` — تشکیل پرونده، ارجاع، صف کارشناس، بستن
+- [x] 2.3 آداپتورها: `payment` (sandbox موفق/ناموفق/تایم‌اوت)، `tracking` (صف + ثبت کارشناس)، `notification` (log) + تست
 - [ ] 2.4 `audit.ts` + `rbac.ts` (`can(user, action, resource)`) + تست دسترسی منفی
 
 ## فاز ۳ — احراز هویت و پنل کارمندی
