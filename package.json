@@ -14,6 +14,11 @@
     "seed": "node --no-warnings scripts/seed.mjs",
     "e2e": "node --no-warnings scripts/e2e.mjs",
     "setup": "npm run migrate && npm run seed",
+    "diagrams": "node --no-warnings scripts/generate-diagrams.mjs",
+    "diagrams:check": "node --no-warnings scripts/generate-diagrams.mjs --check",
+    "diagrams:view": "node --no-warnings scripts/diagram-viewer.mjs",
+    "diagrams:vendor": "node --no-warnings scripts/vendor-mermaid.mjs",
+    "flowchart": "node --no-warnings scripts/generate-flowchart.mjs",
     "docker:build": "docker build -t crm-realestate .",
     "test:browser": "BROWSER_FLOW_BASE=${BROWSER_FLOW_BASE:-http://127.0.0.1:3000} vitest run tests/session-browser-flow.test.ts"
   },

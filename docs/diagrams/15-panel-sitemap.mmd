@@ -1,0 +1,87 @@
+---
+title: نقشه صفحات پنل، Server Actionها و APIها
+---
+flowchart LR
+  classDef page fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef admin fill:#fce7f3,stroke:#be185d,color:#831843;
+  classDef action fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef api fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef svc fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
+
+  Login["/login<br/>ورود کارکنان + SSO اختیاری"]:::page
+  Home["/ → هدایت به /panel یا /login"]:::page
+
+  subgraph KART["گروه «کارتابل»"]
+    direction TB
+    Dash["/panel — داشبورد<br/>صف کارشناس، آمار، سررسیدها"]:::page
+    Tasks["/panel/tasks — وظایف من"]:::page
+  end
+
+  subgraph CASES["گروه «پرونده‌ها»"]
+    direction TB
+    Cases["/panel/cases — همه پرونده‌ها<br/>فیلتر خدمت: contract/listing/requirements/custom"]:::page
+    CaseDetail["/panel/cases/[id] — جزئیات پرونده<br/>تایم‌لاین، مدارک، امضا، مالی، رهگیری، وظایف، اقدام‌ها"]:::page
+    Listings["/panel/listings — آگهی‌ها"]:::page
+    Reqs["/panel/requirements — نیازمندی‌ها و تطبیق‌ها"]:::page
+    Users["/panel/users — کاربران سینک‌شده"]:::page
+    UserDetail["/panel/users/[id] — پرونده کاربر"]:::page
+  end
+
+  subgraph ADMIN["گروه «مدیریت» — فقط admin"]
+    direction TB
+    Services["/panel/services — خدمات و قیمت‌ها"]:::admin
+    Workflows["/panel/workflows — گردش‌کارها<br/>import نسخه تازه + activate"]:::admin
+    Staff["/panel/staff — کارمندان"]:::admin
+    SyncPage["/panel/sync — وضعیت سینک<br/>لاگ‌ها، وب‌هوک‌ها، کرسورها، تنظیمات"]:::admin
+    Audit["/panel/audit — لاگ حسابرسی"]:::admin
+  end
+
+  subgraph ACT["Server Actionها"]
+    direction TB
+    ALogin["login/actions.ts<br/>loginAction · logoutAction · bootstrapAdminAction"]:::action
+    ACases["panel/cases/actions.ts<br/>createCase · transition · saveContract · reviewDocument<br/>markSignature · saveListing · saveRequirement · computeMatches<br/>addTask · completeTask · reassignCase"]:::action
+    AServices["panel/services/actions.ts<br/>saveService · toggleService"]:::action
+    AWorkflows["panel/workflows/actions.ts<br/>importWorkflow · activateWorkflow"]:::action
+    AStaff["panel/staff/actions.ts<br/>createStaff · updateStaff · resetPassword · revokeSessions"]:::action
+    ASync["panel/sync/actions.ts<br/>pullNow · dispatchWebhooks · saveSyncSettings<br/>seedDefinitions · retryWebhook · purgeDeadWebhooks"]:::action
+  end
+
+  subgraph API["APIهای HTTP — src/app/api"]
+    direction TB
+    ApiHealth["GET /api/health"]:::api
+    ApiSession["GET|DELETE /api/auth/session"]:::api
+    ApiIngest["POST|GET /api/v1/ingest/[entity]"]:::api
+    ApiPull["POST|GET /api/v1/jobs/pull"]:::api
+    ApiHooks["POST|GET /api/v1/jobs/dispatch-webhooks"]:::api
+  end
+
+  SVC["لایه سرویس<br/>CaseService · sync.ts · definitions.ts · auth"]:::svc
+  DB[("SQLite — /data/crm.db")]:::svc
+  Main["سرور اصلی کارفرما"]:::api
+
+  Login --> Dash
+  Home --> Dash
+  Dash --> Cases
+  Dash --> Tasks
+  Cases --> CaseDetail
+  Users --> UserDetail
+  CaseDetail --> Listings
+  CaseDetail --> Reqs
+
+  Dash -.-> ACT
+  Cases -.-> ACases
+  CaseDetail -.-> ACases
+  Listings -.-> ACases
+  Reqs -.-> ACases
+  Services -.-> AServices
+  Workflows -.-> AWorkflows
+  Staff -.-> AStaff
+  SyncPage -.-> ASync
+  Login -.-> ALogin
+
+  ACT --> SVC
+  API --> SVC
+  SVC --> DB
+  ApiIngest <-->|"Push"| Main
+  ApiPull -->|"Pull"| Main
+  ApiHooks -->|"Webhook"| Main

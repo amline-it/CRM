@@ -1,0 +1,92 @@
+---
+title: معماری کلی CRM املاک — لایه‌ها، ورودی‌ها و وابستگی‌ها
+---
+flowchart LR
+  classDef ext fill:#f1f5f9,stroke:#475569,color:#0f172a,stroke-width:1px;
+  classDef web fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef app fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
+  classDef dom fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef data fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef sec fill:#fce7f3,stroke:#be185d,color:#831843;
+
+  Staff["کارشناس / مدیر<br/>مرورگر RTL · تقویم جلالی"]:::ext
+  Main["سرور اصلی کارفرما<br/>کاربران · قراردادها · آگهی‌ها · نیازمندی‌ها"]:::ext
+  Cron["زمان‌بند سرور (cron)<br/>هر ۵ تا ۱۵ دقیقه"]:::ext
+
+  subgraph CRM["CRM خودمیزبان — Next.js 16 App Router روی Node 22.5+ (خروجی standalone)"]
+    direction TB
+
+    subgraph WEB["لایه وب — src/app"]
+      direction LR
+      Proxy["src/proxy.ts<br/>تبدیل ?t=… به هدر X-Session-Ticket"]:::web
+      Panel["پنل کارکنان /panel/**<br/>Server Components + Server Actions"]:::web
+      ApiSync["API سینک /api/v1/**<br/>ingest/[entity] · jobs/pull · jobs/dispatch-webhooks"]:::web
+      ApiMisc["/api/health · /api/auth/session · /logout · /login"]:::web
+    end
+
+    subgraph APPL["لایه سرویس — src/services و src/domain/service"]
+      direction LR
+      Svc["CaseService<br/>createCase · applyTransition · loadRuntime<br/>recordPaymentAttempt · markSignature · reviewDocument"]:::app
+      Sync["sync.ts<br/>ingest · pullOnce · dispatchDueWebhooks · syncOverview"]:::app
+      Defs["definitions.ts<br/>seed تعریف گردش‌کارها و خدمات"]:::app
+      Auth["src/auth/**<br/>session · jwt · csrf · rbac · password · ticket · demo"]:::sec
+    end
+
+    subgraph DOM["دامنه خالص (بدون I/O) — src/domain"]
+      direction LR
+      WF["workflows<br/>buildEngine + ثبت گاردها و افکت‌ها"]:::dom
+      Engine["engine<br/>available · plan · validate"]:::dom
+      Guards["guards<br/>۳۲ گارد نام‌دار"]:::dom
+      Effects["effects<br/>۲۵ افکت نام‌دار"]:::dom
+      Adapters["adapters<br/>پرداخت · کد رهگیری · اعلان"]:::dom
+    end
+
+    subgraph DATA["لایه داده — src/db"]
+      direction LR
+      Repos["repos<br/>cases · catalog · finance · people · platform"]:::data
+      Client["client.ts<br/>node:sqlite · WAL · کوئری پارامتری"]:::data
+      Migrate["migrate.ts<br/>مهاجرت نسخه‌دار"]:::data
+      DB[("SQLite<br/>/data/crm.db — ۳۱ جدول")]:::data
+    end
+
+    WFD[("workflow-definitions/*.json<br/>منبع حقیقت گردش‌کارها")]:::data
+    Libs["src/lib<br/>errors · ids · jalali · money · fa-labels"]:::data
+  end
+
+  Staff -->|"HTTPS + کوکی نشست"| Proxy
+  Proxy --> Panel
+  Proxy --> ApiMisc
+  Main -->|"Push: POST /api/v1/ingest/*<br/>X-Sync-Key + X-Signature (HMAC)"| ApiSync
+  ApiSync -->|"Pull: GET {SYNC_PULL_URL}/{entity}?since=…"| Main
+  ApiSync -->|"Webhook خروجی: POST با X-Webhook-Signature"| Main
+  Cron -->|"POST /api/v1/jobs/pull<br/>POST /api/v1/jobs/dispatch-webhooks"| ApiSync
+
+  Panel --> Auth
+  Panel --> Svc
+  Panel --> Sync
+  Panel --> Defs
+  ApiSync --> Sync
+  ApiSync --> Auth
+  Sync --> Svc
+  Sync --> Repos
+  Defs --> WFD
+  Defs --> Repos
+
+  Svc --> WF
+  Svc --> Repos
+  Svc --> Adapters
+  Svc --> Auth
+  WF --> Engine
+  WF --> Guards
+  WF --> Effects
+  Engine --> Guards
+  Engine --> Effects
+
+  Repos --> Client
+  Client --> DB
+  Migrate --> DB
+  Auth --> Repos
+  Engine -.->|"خواندن وضعیت جهان"| Repos
+  Svc --> Libs
+  Panel --> Libs
+  Sync --> Libs

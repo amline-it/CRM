@@ -1,0 +1,48 @@
+---
+title: استقرار — داکر، والیوم داده، معکوس‌پروکسی و زمان‌بندی
+---
+flowchart TB
+  classDef host fill:#f1f5f9,stroke:#475569,color:#0f172a;
+  classDef cont fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef data fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef ext fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef warn fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+
+  Client["مرورگر کارشناس/مدیر"]:::ext
+  MainSrv["سرور اصلی کارفرما<br/>(Push / Pull / Webhook)"]:::ext
+
+  subgraph HOST["سرور میزبان (Linux + Docker)"]
+    direction TB
+    NGX["Nginx / معکوس‌پروکسی<br/>HTTPS + دامنه اختصاصی (crm.example.com)<br/>CSP frame-ancestors در next.config.ts"]:::host
+    Cron["crontab میزبان<br/>هر دقیقه: dispatch-webhooks<br/>هر ۱۵ دقیقه: jobs/pull (در صورت فعال‌بودن Pull)"]:::host
+
+    subgraph COMPOSE["docker-compose.yml — سرویس crm"]
+      direction TB
+      subgraph IMG["ایمیج crm-realestate:latest (node:24-alpine، چندمرحله‌ای)"]
+        direction TB
+        Tini["tini به‌عنوان ENTRYPOINT<br/>کاربر غیرریشه nextjs (uid 1001)"]:::cont
+        Boot["CMD: scripts/migrate.mjs → scripts/seed.mjs → node server.js"]:::cont
+        Next["Next.js standalone (output: standalone)<br/>HOSTNAME=0.0.0.0 · PORT=3000 · TZ=Asia/Tehran"]:::cont
+        Assets[".next/static · public · migrations<br/>workflow-definitions · src/data · scripts"]:::cont
+      end
+      Health["HEALTHCHECK هر ۳۰ ثانیه<br/>GET /api/health"]:::cont
+    end
+
+    Vol[("والیوم crm-data → /data<br/>crm.db + WAL (SQLite داخلی Node)<br/>پشتیبان‌گیری = کپی همین فایل")]:::data
+    Env[".env میزبان<br/>SESSION_SECRET (الزامی) · SYNC_API_KEY · SYNC_SECRET<br/>SYNC_PULL_URL · WEBHOOK_TARGET_URL · WEBHOOK_SECRET<br/>SSO_* · PAYMENT/TRACKING/NOTIFICATION_PROVIDER<br/>LOCAL_DEMO_MODE=false (صریح در compose)"]:::data
+  end
+
+  Client -->|"HTTPS"| NGX
+  NGX -->|"proxy_pass → :3000"| Next
+  MainSrv -->|"POST /api/v1/ingest/* با HMAC"| NGX
+  Next -->|"GET {SYNC_PULL_URL}/{entity}?since=…"| MainSrv
+  Next -->|"POST وب‌هوک با X-Webhook-Signature"| MainSrv
+  Cron -->|"curl -X POST با X-Sync-Key روی 127.0.0.1:3000"| Next
+  Boot --> Tini
+  Next --> Vol
+  Boot -->|"مهاجرت + seed تعریف‌ها و خدمات در اولین اجرا"| Vol
+  Env -->|"environment:"| Next
+  Health -.->|"بررسی زنده‌بودن"| Next
+
+  Note["نکته امنیتی: LOCAL_DEMO_MODE روی سرور باید false بماند<br/>وگرنه پنل بدون ورود با نقش مدیر باز می‌شود"]:::warn
+  Env -.-> Note

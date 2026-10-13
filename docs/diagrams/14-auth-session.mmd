@@ -1,0 +1,68 @@
+---
+title: احراز هویت، نشست و کنترل دسترسی پنل کارکنان
+---
+flowchart TD
+  classDef ok fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef err fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+  classDef proc fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef dec fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef sec fill:#fce7f3,stroke:#be185d,color:#831843;
+
+  subgraph LOGIN["ورود — /login"]
+    direction TB
+    L0(["کارمند نام کاربری و رمز را می‌فرستد"]):::proc
+    L1{"توکن CSRF فرم معتبر است؟<br/>nonce.issuedAt.HMAC با SESSION_SECRET"}:::dec
+    L1 -->|نه| LE1["«اعتبار فرم منقضی شده است»<br/>+ توکن تازه در پاسخ"]:::err
+    L1 -->|بله| L2{"توکن SSO ارسال شده<br/>و SSO_ENABLED=true ؟"}:::dec
+    L2 -->|بله| L3["verifySsoToken (JWT HS256)<br/>یافتن کارمند با username یا sso_subject"]:::sec
+    L2 -->|نه| L4["verifyPassword — scrypt با نمک اختصاصی"]:::sec
+    L3 --> L5{"کارمند یافت شد و active است؟"}:::dec
+    L4 --> L5
+    L5 -->|نه| LE2["«نام کاربری یا رمز عبور نادرست است»<br/>/ «حساب شما غیرفعال است»"]:::err
+    L5 -->|بله| L6["signSessionToken — JWT با SESSION_SECRET (۱۲ ساعت)<br/>createSession — ذخیره token_hash در جدول sessions<br/>touchStaffLogin + writeAudit(auth.login)"]:::ok
+    L6 --> L7["کوکی crm_session<br/>HttpOnly · SameSite=Lax (یا None+Secure+Partitioned در iframe)"]:::ok
+    L6 --> L8["بازگرداندن ticket به کلاینت<br/>session-bridge: حافظه + ?t=… + localStorage"]:::ok
+  end
+
+  subgraph REQ["هر درخواست بعدی"]
+    direction TB
+    R0(["درخواست مرورگر به /panel/**"]):::proc
+    R1{"کوکی نشست حاضر است؟"}:::dec
+    R1 -->|بله| R4
+    R1 -->|نه — مسدود در iframe| R2{"پروکسی: پارامتر ?t=…<br/>یا هدر X-Session-Ticket / Bearer ؟"}:::dec
+    R2 -->|بله| R3["src/proxy.ts → تبدیل به هدر X-Session-Ticket"]:::sec
+    R2 -->|نه| R5{"LOCAL_DEMO_MODE=true ؟"}:::dec
+    R5 -->|بله — فقط ماشین توسعه| R6["نشست نمایشی با نقش مدیر<br/>(بدون ردیف در دیتابیس) + نشان هشدار در پنل"]:::err
+    R5 -->|نه| R7["redirect به /login"]:::err
+    R3 --> R4["sessionFromToken<br/>۱) verifySessionToken (JWT) ۲) یافتن ردیف sessions با token_hash<br/>۳) revoked_at و expires_at ۴) staff.active"]:::sec
+    R4 --> R8{"نشست معتبر است؟"}:::dec
+    R8 -->|نه| R7
+    R8 -->|بله| R9["CurrentSession {staff, role}"]:::ok
+  end
+
+  subgraph GUARD["محافظت هر اقدام"]
+    direction TB
+    G1["assertCsrf / assertCsrfHeader<br/>روی همه Server Actionها و فرم‌ها"]:::sec
+    G2["requirePermission → can(role, permission)<br/>ماتریس RBAC: staff در برابر admin"]:::sec
+    G3["writeAudit — ثبت در audit_log<br/>بازیابی در پنل «لاگ حسابرسی»"]:::ok
+    G1 --> G2 --> G3
+  end
+
+  subgraph OUT["خروج — /logout"]
+    direction TB
+    O1["revokeSession برای کوکی و ticket هر دو<br/>حذف کوکی + redirect به /login"]:::ok
+  end
+
+  L7 --> R0
+  L8 --> R0
+  R9 --> G1
+  R6 --> G1
+  G3 --> BIZ(["اجرای عملیات: گذار پرونده، بررسی مدرک، پرداخت، سینک…"]):::proc
+  BIZ --> O1
+
+  subgraph ROLES["ماتریس دسترسی (src/auth/rbac.ts)"]
+    direction LR
+    RS["نقش staff<br/>case.view/create/transition/assign · document.review<br/>payment.record · tracking.manage · listing.manage<br/>requirement.manage · user.view · task.manage · report.view"]:::proc
+    RA["فقط admin<br/>case.abort/close · legal.review · payment.abort · tracking.abort<br/>referral.manage · service.manage · workflow.manage<br/>staff.manage · settings.manage · sync.manage · audit.view"]:::sec
+  end
+  G2 -.->|"منبع حقیقت"| ROLES

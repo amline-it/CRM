@@ -1,0 +1,39 @@
+---
+title: قالب سایر خدمات (custom_service v1) — 9 حالت و 9 گذار
+---
+stateDiagram-v2
+  direction TB
+  state "شروع خدمت ⟦آغاز⟧<br/>service_start" as service_start
+  state "تکمیل اطلاعات و مدارک خدمت<br/>service_details" as service_details
+  state "بررسی شرایط مالی خدمت ⟦تصمیم⟧<br/>service_finance" as service_finance
+  state "خطای مالی و پیگیری ⟦خطا/حلقه⟧<br/>service_finance_error" as service_finance_error
+  state "اجرای مراحل اختصاصی خدمت<br/>service_execution" as service_execution
+  state "بررسی و تأیید نتیجه<br/>service_review" as service_review
+  state "اعلام نقص و درخواست اصلاح ⟦خطا/حلقه⟧<br/>service_needs_fix" as service_needs_fix
+  state "تحویل نتیجه خدمت ⟦پایانی⟧<br/>service_delivered" as service_delivered
+  state "لغو خدمت ⟦پایانی⟧<br/>service_cancelled" as service_cancelled
+
+  [*] --> service_start
+  service_delivered --> [*]
+  service_cancelled --> [*]
+
+  service_start --> service_details : تکمیل اطلاعات و مدارک خدمت
+  service_details --> service_finance : بررسی شرایط مالی خدمت
+  service_finance --> service_execution : تأیید شرایط مالی خدمت
+  service_finance_error --> service_execution : تأیید شرایط مالی خدمت
+  service_finance --> service_finance_error : ثبت خطای مالی و پیگیری
+  service_execution --> service_review : اعلام نتیجه اجرای خدمت
+  service_review --> service_delivered : تأیید نتیجه خدمت و تحویل
+  service_review --> service_needs_fix : اعلام نقص و درخواست اصلاح
+  service_needs_fix --> service_execution : اصلاح و اجرای مجدد
+  service_details --> service_cancelled : لغو خدمت
+  service_finance --> service_cancelled : لغو خدمت
+  service_finance_error --> service_cancelled : لغو خدمت
+  service_execution --> service_cancelled : لغو خدمت
+  service_review --> service_cancelled : لغو خدمت
+  service_needs_fix --> service_cancelled : لغو خدمت
+
+  note right of service_start
+    منبع حقیقت: workflow-definitions/custom_service.v1.json
+    نسخه‌ای که پرونده با آن ساخته می‌شود قفل می‌گردد
+  end note

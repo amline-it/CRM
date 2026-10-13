@@ -1,0 +1,457 @@
+---
+title: ERD کامل — ۳۱ جدول SQLite (تولیدشده از migrations/0001_init.sql)
+---
+erDiagram
+  STAFF ||--o{ SESSIONS : "کارمند"
+  CASES ||--o{ CASE_TRANSITIONS : "پرونده"
+  CASES ||--o{ TIMELINE_EVENTS : "پرونده"
+  CASES |o--o{ TASKS : "پرونده"
+  CASES ||--o{ DOCUMENTS : "پرونده"
+  CASES ||--|| CONTRACT_DETAILS : "پرونده"
+  CASES ||--o{ LEGAL_REVIEWS : "پرونده"
+  CASES ||--o{ SIGNATURES : "پرونده"
+  CASES ||--|| TRACKING_REQUESTS : "پرونده"
+  CASES ||--o{ INVOICES : "پرونده"
+  CASES ||--o{ PAYMENTS : "پرونده"
+  INVOICES |o--o{ PAYMENTS : "فاکتور"
+  REFERRAL_CODES ||--o{ REFERRAL_USES : "کد ریفرال"
+  CASES ||--o{ REFERRAL_USES : "پرونده"
+  CASES |o--o{ LISTINGS : "پرونده"
+  CASES |o--o{ REQUIREMENTS : "پرونده"
+  REQUIREMENTS ||--o{ REQUIREMENT_MATCHES : "نیازمندی"
+  SYNC_LOG |o--o{ SYNC_ITEM_RESULTS : "لاگ سینک"
+  SERVICES ||--o{ CASES : "خدمت (service_key) — منطقی"
+  WORKFLOW_DEFINITIONS ||--o{ CASES : "گردش‌کار (workflow_key) — منطقی"
+  USERS |o--o{ CASES : "مالک پرونده — منطقی"
+  USERS |o--o{ CASES : "کارگزار — منطقی"
+  STAFF |o--o{ CASES : "کارشناس مسئول — منطقی"
+  STAFF |o--o{ TASKS : "انجام‌دهنده وظیفه — منطقی"
+  STAFF |o--o{ TASKS : "سازنده وظیفه — منطقی"
+  STAFF |o--o{ DOCUMENTS : "بررسی‌کننده مدرک — منطقی"
+  STAFF |o--o{ LEGAL_REVIEWS : "بررسی‌کننده حقوقی — منطقی"
+  STAFF |o--o{ TIMELINE_EVENTS : "کنشگر رویداد — منطقی"
+  USERS |o--o{ SUBSCRIPTIONS : "اشتراک کاربر — منطقی"
+  USERS |o--o{ REFERRAL_CODES : "صاحب کد — منطقی"
+  STAFF |o--o{ REFERRAL_USES : "تأییدکننده مصرف — منطقی"
+  USERS |o--o{ LISTINGS : "مالک آگهی — منطقی"
+  USERS |o--o{ LISTINGS : "کارگزار آگهی — منطقی"
+  USERS |o--o{ REQUIREMENTS : "درخواست‌کننده نیازمندی — منطقی"
+  LISTINGS ||--o{ REQUIREMENT_MATCHES : "آگهی تطبیق‌شده — منطقی"
+  USERS |o--o{ NOTIFICATIONS : "گیرنده پیام — منطقی"
+  CASES |o--o{ NOTIFICATIONS : "پرونده مرتبط — منطقی"
+  CASES |o--o{ OUTBOUND_WEBHOOKS : "پرونده مرتبط — منطقی"
+
+  SCHEMA_MIGRATIONS {
+    text version PK "نسخه"
+    text applied_at
+  }
+  SETTINGS {
+    text key PK "کلید"
+    text value
+    text updated_at "زمان به‌روزرسانی"
+  }
+  STAFF {
+    text id PK "شناسه یکتا"
+    text username UK "نام کاربری"
+    text password_hash "هش رمز (scrypt)"
+    text full_name "نام کامل"
+    text role "نقش"
+    integer active "فعال است"
+    text sso_subject UK
+    text last_login_at
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  SESSIONS {
+    text id PK "شناسه یکتا"
+    text staff_id FK "کارمند"
+    text token_hash UK "هش توکن نشست"
+    text user_agent
+    text ip
+    text created_at "زمان ایجاد"
+    text expires_at "انقضا"
+    text revoked_at "زمان ابطال"
+  }
+  USERS {
+    text id PK "شناسه یکتا"
+    text external_id "شناسه در سرور اصلی"
+    text source "منبع داده"
+    text full_name "نام کامل"
+    text national_id
+    text mobile "موبایل"
+    text email "رایانامه"
+    text user_type
+    text agent_license_no
+    text city "شهر"
+    text status "وضعیت"
+    integer deleted "حذف‌شده"
+    text payload_hash
+    text raw
+    text synced_at
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  SERVICES {
+    text id PK "شناسه یکتا"
+    text key UK "کلید"
+    text name "نام"
+    text category
+    text description
+    integer price "قیمت"
+    integer requires_subscription
+    integer requires_referral
+    text workflow_key "کلید گردش‌کار"
+    text required_documents
+    integer active "فعال است"
+    integer sort_order
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  CASES {
+    text id PK "شناسه یکتا"
+    text code UK "کد"
+    text external_id "شناسه در سرور اصلی"
+    text source "منبع داده"
+    text title "عنوان"
+    text service_key "کلید خدمت"
+    text workflow_key "کلید گردش‌کار"
+    integer workflow_version "نسخه قفل‌شده گردش‌کار"
+    text state "حالت گردش‌کار"
+    text status "وضعیت"
+    text outcome "نتیجه پرونده"
+    text priority "اولویت"
+    text owner_user_id
+    text agent_user_id
+    text assigned_staff_id
+    text due_at "سررسید"
+    integer requires_tracking "نیاز به کد رهگیری"
+    text access_level "سطح دسترسی"
+    text queue "صف کاری"
+    integer attempts_payment "تلاش‌های پرداخت"
+    integer attempts_tracking "تلاش‌های کد رهگیری"
+    text meta
+    text opened_at
+    text closed_at
+    text last_transition_at
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  CASE_TRANSITIONS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text from_state
+    text to_state
+    text transition_key
+    text transition_name
+    text option
+    text actor_type
+    text actor_id
+    text actor_name
+    text reason
+    text payload "بار JSON"
+    text idempotency_key UK "کلید یکتاسازی"
+    text at "زمان رویداد"
+  }
+  TIMELINE_EVENTS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text kind
+    text title "عنوان"
+    text body
+    text visibility
+    text actor_id
+    text actor_name
+    text at "زمان رویداد"
+    text meta
+  }
+  TASKS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text title "عنوان"
+    text description
+    text priority "اولویت"
+    text assignee_id
+    text due_at "سررسید"
+    text status "وضعیت"
+    text result_note
+    text created_by
+    text dedupe_key UK
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+    text completed_at
+  }
+  DOCUMENTS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text kind
+    text title "عنوان"
+    text status "وضعیت"
+    text note "یادداشت"
+    text review_note
+    text reviewed_by
+    text reviewed_at
+    text file_name
+    integer version "نسخه"
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  CONTRACT_DETAILS {
+    text id PK "شناسه یکتا"
+    text case_id FK, UK "پرونده"
+    text contract_type "نوع قرارداد (rent/sale)"
+    text output_mode "خروجی موردنیاز"
+    text property_address
+    text city "شهر"
+    text district "محله"
+    real area "متراژ"
+    text landlord_name
+    text tenant_name
+    text seller_name
+    text buyer_name
+    integer deposit_amount
+    integer rent_amount
+    integer sale_price
+    text start_date
+    text end_date
+    text terms_note
+    integer clause_version "نسخه بندها"
+    text document_generated_at
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  LEGAL_REVIEWS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text reviewer_id
+    text result
+    text note "یادداشت"
+    integer clause_version_at_review
+    text at "زمان رویداد"
+  }
+  SIGNATURES {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text party
+    text party_name
+    text status "وضعیت"
+    text method "روش"
+    text signed_at
+    text note "یادداشت"
+    text created_at "زمان ایجاد"
+  }
+  TRACKING_REQUESTS {
+    text id PK "شناسه یکتا"
+    text case_id FK, UK "پرونده"
+    text status "وضعیت"
+    text code "کد"
+    text error
+    integer attempts "شمار تلاش‌ها"
+    text requested_at
+    text received_at
+    text updated_at "زمان به‌روزرسانی"
+  }
+  INVOICES {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text title "عنوان"
+    integer amount "مبلغ"
+    text status "وضعیت"
+    text method "روش"
+    text created_at "زمان ایجاد"
+    text paid_at
+  }
+  PAYMENTS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text invoice_id FK
+    text method "روش"
+    integer amount "مبلغ"
+    text status "وضعیت"
+    text provider
+    text provider_ref
+    text error
+    integer attempt "شماره تلاش"
+    text paid_at
+    text created_at "زمان ایجاد"
+  }
+  SUBSCRIPTIONS {
+    text id PK "شناسه یکتا"
+    text user_id "کاربر"
+    text plan_key
+    text scope
+    text starts_at
+    text ends_at
+    text status "وضعیت"
+    text created_at "زمان ایجاد"
+  }
+  REFERRAL_CODES {
+    text id PK "شناسه یکتا"
+    text code UK "کد"
+    text kind
+    text owner_user_id
+    text scope
+    integer max_uses
+    integer used_count
+    text expires_at "انقضا"
+    integer active "فعال است"
+    text note "یادداشت"
+    text created_at "زمان ایجاد"
+  }
+  REFERRAL_USES {
+    text id PK "شناسه یکتا"
+    text code_id FK
+    text case_id FK "پرونده"
+    text approved_by
+    text used_at
+  }
+  LISTINGS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text external_id "شناسه در سرور اصلی"
+    text source "منبع داده"
+    text owner_user_id
+    text agent_user_id
+    text deal_type "نوع معامله"
+    text property_type "نوع ملک"
+    text city "شهر"
+    text district "محله"
+    text address "نشانی"
+    real area "متراژ"
+    integer rooms
+    integer year_built
+    integer price "قیمت"
+    integer deposit
+    integer rent
+    text description
+    text amenities
+    text images
+    text status "وضعیت"
+    text reject_reason
+    text published_at
+    text expires_at "انقضا"
+    integer views
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  REQUIREMENTS {
+    text id PK "شناسه یکتا"
+    text case_id FK "پرونده"
+    text external_id "شناسه در سرور اصلی"
+    text source "منبع داده"
+    text requester_user_id
+    text deal_type "نوع معامله"
+    text property_type "نوع ملک"
+    text city "شهر"
+    text districts
+    integer budget_min
+    integer budget_max
+    real area_min
+    real area_max
+    integer rooms
+    text description
+    text access_level "سطح دسترسی"
+    text status "وضعیت"
+    text expires_at "انقضا"
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  REQUIREMENT_MATCHES {
+    text id PK "شناسه یکتا"
+    text requirement_id FK
+    text listing_id
+    real score "امتیاز تطبیق"
+    text note "یادداشت"
+    text at "زمان رویداد"
+  }
+  NOTIFICATIONS {
+    text id PK "شناسه یکتا"
+    text channel "کانال"
+    text template "قالب پیام"
+    text to_user_id
+    text to_address
+    text case_id "پرونده"
+    text body
+    text status "وضعیت"
+    text error
+    text provider
+    text sent_at
+    text created_at "زمان ایجاد"
+  }
+  WORKFLOW_DEFINITIONS {
+    text id PK "شناسه یکتا"
+    text key "کلید"
+    integer version "نسخه"
+    text name "نام"
+    text definition "JSON تعریف"
+    integer active "فعال است"
+    text created_at "زمان ایجاد"
+    text activated_at
+  }
+  SYNC_LOG {
+    text id PK "شناسه یکتا"
+    text direction "جهت سینک"
+    text channel "کانال"
+    text entity_type "نوع موجودیت"
+    text source "منبع داده"
+    text idempotency_key "کلید یکتاسازی"
+    integer item_count
+    integer created
+    integer updated
+    integer unchanged
+    integer rejected
+    text status "وضعیت"
+    text detail
+    text actor
+    integer duration_ms
+    text at "زمان رویداد"
+  }
+  SYNC_ITEM_RESULTS {
+    text id PK "شناسه یکتا"
+    text sync_log_id FK
+    text entity_type "نوع موجودیت"
+    text external_id "شناسه در سرور اصلی"
+    text action
+    text reason
+    text at "زمان رویداد"
+  }
+  OUTBOUND_WEBHOOKS {
+    text id PK "شناسه یکتا"
+    text event "رویداد"
+    text case_id "پرونده"
+    text payload "بار JSON"
+    text target_url "آدرس مقصد"
+    text status "وضعیت"
+    integer attempts "شمار تلاش‌ها"
+    text last_error
+    text next_attempt_at
+    text delivered_at
+    text created_at "زمان ایجاد"
+    text updated_at "زمان به‌روزرسانی"
+  }
+  PULL_CURSORS {
+    text id PK "شناسه یکتا"
+    text entity_type UK "نوع موجودیت"
+    text last_pulled_at "آخرین واکشی"
+    text last_cursor
+    text updated_at "زمان به‌روزرسانی"
+  }
+  AUDIT_LOG {
+    text id PK "شناسه یکتا"
+    text actor_type
+    text actor_id
+    text actor_name
+    text action
+    text entity_type "نوع موجودیت"
+    text entity_id
+    text detail
+    text ip
+    text at "زمان رویداد"
+  }
+  IDEMPOTENCY_KEYS {
+    text key PK "کلید"
+    text scope
+    integer status "وضعیت"
+    text response
+    text created_at "زمان ایجاد"
+    text expires_at "انقضا"
+  }

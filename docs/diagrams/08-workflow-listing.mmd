@@ -1,0 +1,38 @@
+---
+title: فرایند آگهی (listing v1) — 10 حالت و 11 گذار
+---
+stateDiagram-v2
+  direction TB
+  state "شروع فرایند ثبت آگهی ⟦آغاز⟧<br/>listing_start" as listing_start
+  state "بررسی شرایط مالی مختص آگهی<br/>listing_finance" as listing_finance
+  state "تکمیل اطلاعات و مدارک آگهی<br/>listing_info" as listing_info
+  state "بررسی آگهی توسط کارشناس<br/>listing_review" as listing_review
+  state "نتیجه بررسی آگهی ⟦تصمیم⟧<br/>listing_result" as listing_result
+  state "اعلام نقص یا علت رد ⟦خطا/حلقه⟧<br/>listing_needs_fix" as listing_needs_fix
+  state "انتشار و مدیریت وضعیت آگهی<br/>listing_published" as listing_published
+  state "توقف موقت انتشار<br/>listing_paused" as listing_paused
+  state "انقضای آگهی ⟦پایانی⟧<br/>listing_expired" as listing_expired
+  state "بسته‌شدن آگهی ⟦پایانی⟧<br/>listing_closed" as listing_closed
+
+  [*] --> listing_start
+  listing_expired --> [*]
+  listing_closed --> [*]
+
+  listing_start --> listing_finance : بررسی شرایط مالی آگهی ⟦خودکار⟧
+  listing_finance --> listing_info : تأیید شرایط مالی (پرداخت، اشتراک یا معافیت)
+  listing_info --> listing_review : تکمیل اطلاعات و مدارک آگهی
+  listing_review --> listing_result : ثبت نتیجه بررسی کارشناس
+  listing_result --> listing_needs_fix : اعلام نقص یا علت رد
+  listing_needs_fix --> listing_info : اصلاح و ارسال مجدد آگهی
+  listing_result --> listing_published : انتشار آگهی
+  listing_published --> listing_paused : توقف موقت انتشار
+  listing_paused --> listing_published : انتشار مجدد
+  listing_published --> listing_expired : انقضای آگهی ⟦خودکار⟧
+  listing_paused --> listing_expired : انقضای آگهی ⟦خودکار⟧
+  listing_published --> listing_closed : بستن آگهی (معامله انجام شد یا لغو)
+  listing_paused --> listing_closed : بستن آگهی (معامله انجام شد یا لغو)
+
+  note right of listing_start
+    منبع حقیقت: workflow-definitions/listing.v1.json
+    نسخه‌ای که پرونده با آن ساخته می‌شود قفل می‌گردد
+  end note

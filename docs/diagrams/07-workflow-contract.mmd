@@ -1,0 +1,104 @@
+---
+title: فرایند قرارداد (contract v1) — 33 حالت و 41 گذار
+---
+stateDiagram-v2
+  direction TB
+  state "شروع پرونده قرارداد ⟦آغاز⟧<br/>contract_start" as contract_start
+  state "ثبت اطلاعات اجاره<br/>rent_info" as rent_info
+  state "ثبت اطلاعات خرید و فروش<br/>sale_info" as sale_info
+  state "تعیین خروجی موردنیاز ⟦تصمیم⟧<br/>output_choice" as output_choice
+  state "بدون کد رهگیری<br/>no_tracking" as no_tracking
+  state "با درخواست کد رهگیری<br/>with_tracking" as with_tracking
+  state "تشکیل پرونده خدمت<br/>case_created" as case_created
+  state "بررسی شرایط مالی مختص همین خدمت ⟦تصمیم⟧<br/>finance_check" as finance_check
+  state "پرداخت مستقیم ⟦تصمیم⟧<br/>payment_direct" as payment_direct
+  state "اشتراک برای این خدمت معتبر است؟ ⟦تصمیم⟧<br/>subscription_check" as subscription_check
+  state "شرایط ریفرال یا معافیت تأیید شده است؟ ⟦تصمیم⟧<br/>referral_check" as referral_check
+  state "ثبت خطا و پیگیری پرداخت ⟦خطا/حلقه⟧<br/>payment_error" as payment_error
+  state "تأیید وضعیت مالی<br/>finance_ok" as finance_ok
+  state "بررسی مدارک قرارداد ⟦تصمیم⟧<br/>documents_review" as documents_review
+  state "اعلام مدارک موردنیاز ⟦خطا/حلقه⟧<br/>documents_incomplete" as documents_incomplete
+  state "اعلام دلیل رد و درخواست اصلاح ⟦خطا/حلقه⟧<br/>documents_rejected" as documents_rejected
+  state "صف بررسی کارشناس<br/>documents_pending_queue" as documents_pending_queue
+  state "نوع قرارداد خرید و فروش است؟ ⟦تصمیم⟧<br/>sale_branch" as sale_branch
+  state "بررسی حقوقی<br/>legal_review" as legal_review
+  state "نتیجه بررسی حقوقی ⟦تصمیم⟧<br/>legal_result" as legal_result
+  state "اصلاح بندهای قرارداد<br/>clause_edit" as clause_edit
+  state "ثبت رد و دلیل آن ⟦پایانی⟧<br/>contract_rejected" as contract_rejected
+  state "نیاز به ویرایش بند دارد؟ ⟦تصمیم⟧<br/>clause_edit_decision" as clause_edit_decision
+  state "آماده‌سازی برای امضا<br/>signature_prep" as signature_prep
+  state "ارسال و پیگیری امضای طرفین<br/>signature_collect" as signature_collect
+  state "امضاهای لازم کامل و معتبرند؟ ⟦تصمیم⟧<br/>signature_check" as signature_check
+  state "پیگیری امضاهای باقی‌مانده ⟦خطا/حلقه⟧<br/>signature_followup" as signature_followup
+  state "کد رهگیری درخواست شده است؟ ⟦تصمیم⟧<br/>tracking_decision" as tracking_decision
+  state "اتمام قرارداد با امضا، بدون کد رهگیری ⟦پایانی⟧<br/>contract_done_no_tracking" as contract_done_no_tracking
+  state "ارسال درخواست کد رهگیری<br/>tracking_request" as tracking_request
+  state "کد رهگیری دریافت شده؟ ⟦تصمیم⟧<br/>tracking_check" as tracking_check
+  state "ثبت خطا و پیگیری رفع مشکل ⟦خطا/حلقه⟧<br/>tracking_error" as tracking_error
+  state "ثبت کد رهگیری و اتمام قرارداد ⟦پایانی⟧<br/>contract_done_with_tracking" as contract_done_with_tracking
+
+  [*] --> contract_start
+  contract_rejected --> [*]
+  contract_done_no_tracking --> [*]
+  contract_done_with_tracking --> [*]
+
+  contract_start --> rent_info : انتخاب نوع قرارداد ▸ اجاره ⟦انتخابی⟧
+  contract_start --> sale_info : انتخاب نوع قرارداد ▸ خرید و فروش ⟦انتخابی⟧
+  rent_info --> output_choice : ثبت اطلاعات اجاره
+  sale_info --> output_choice : ثبت اطلاعات خرید و فروش
+  output_choice --> no_tracking : تعیین خروجی موردنیاز ▸ فقط امضا ⟦انتخابی⟧
+  output_choice --> with_tracking : تعیین خروجی موردنیاز ▸ امضا و کد رهگیری ⟦انتخابی⟧
+  no_tracking --> case_created : تشکیل پرونده خدمت ⟦خودکار⟧
+  with_tracking --> case_created : تشکیل پرونده خدمت ⟦خودکار⟧
+  case_created --> finance_check : ورود به بررسی شرایط مالی ⟦خودکار⟧
+  finance_check --> payment_direct : انتخاب روش تسویه ▸ پرداخت مستقیم ⟦انتخابی⟧
+  finance_check --> subscription_check : انتخاب روش تسویه ▸ اشتراک ⟦انتخابی⟧
+  finance_check --> referral_check : انتخاب روش تسویه ▸ ریفرال یا معافیت ⟦انتخابی⟧
+  finance_check --> finance_ok : انتخاب روش تسویه ▸ بدون نیاز به پرداخت ⟦انتخابی⟧
+  payment_direct --> finance_ok : پرداخت موفق ⟦خودکار⟧
+  payment_error --> finance_ok : پرداخت موفق ⟦خودکار⟧
+  subscription_check --> finance_ok : پرداخت موفق ⟦خودکار⟧
+  referral_check --> finance_ok : پرداخت موفق ⟦خودکار⟧
+  payment_direct --> payment_error : ثبت خطا و پیگیری پرداخت ⟦خودکار⟧
+  subscription_check --> payment_error : ثبت خطا و پیگیری پرداخت ⟦خودکار⟧
+  referral_check --> payment_error : ثبت خطا و پیگیری پرداخت ⟦خودکار⟧
+  payment_error --> payment_direct : تلاش مجدد پرداخت
+  payment_error --> contract_rejected : انصراف از پرداخت و بستن پرونده
+  subscription_check --> finance_ok : اشتراک معتبر است ⟦خودکار⟧
+  subscription_check --> payment_direct : اشتراک معتبر نیست — هدایت به پرداخت مستقیم
+  referral_check --> finance_ok : ریفرال یا معافیت تأیید شد
+  referral_check --> payment_direct : ریفرال یا معافیت تأیید نشد — هدایت به پرداخت مستقیم
+  finance_ok --> documents_review : بررسی مدارک قرارداد ⟦خودکار⟧
+  documents_review --> documents_incomplete : اعلام مدارک موردنیاز
+  documents_review --> documents_rejected : اعلام دلیل رد و درخواست اصلاح
+  documents_incomplete --> documents_review : بارگذاری یا اصلاح مدارک
+  documents_rejected --> documents_review : بارگذاری یا اصلاح مدارک
+  documents_review --> documents_pending_queue : ارسال به صف بررسی کارشناس
+  documents_pending_queue --> documents_review : ثبت نتیجه بررسی مدارک توسط کارشناس
+  documents_review --> sale_branch : تأیید همه مدارک
+  sale_branch --> legal_review : خرید و فروش — بررسی حقوقی ⟦خودکار⟧
+  sale_branch --> clause_edit_decision : اجاره — تصمیم ویرایش بند ⟦خودکار⟧
+  clause_edit_decision --> legal_review : نیاز به ویرایش بند دارد ▸ بله — ارجاع به بررسی حقوقی ⟦انتخابی⟧
+  clause_edit_decision --> signature_prep : نیاز به ویرایش بند دارد ▸ خیر — آماده‌سازی امضا ⟦انتخابی⟧
+  legal_review --> legal_result : آماده ثبت نتیجه بررسی حقوقی ⟦خودکار⟧
+  legal_result --> signature_prep : تأیید بررسی حقوقی
+  legal_result --> clause_edit : نیاز به اصلاح بند
+  legal_result --> contract_rejected : رد قرارداد در بررسی حقوقی
+  clause_edit --> legal_review : اصلاح بندهای قرارداد
+  signature_prep --> signature_collect : ارسال و پیگیری امضای طرفین
+  signature_collect --> signature_check : بررسی وضعیت امضاها
+  signature_followup --> signature_check : بررسی وضعیت امضاها
+  signature_check --> signature_followup : پیگیری امضاهای باقی‌مانده ⟦خودکار⟧
+  signature_check --> tracking_decision : همه امضاها کامل و معتبر ⟦خودکار⟧
+  tracking_decision --> contract_done_no_tracking : اتمام قرارداد بدون کد رهگیری ⟦خودکار⟧
+  tracking_decision --> tracking_request : ارسال درخواست کد رهگیری ⟦خودکار⟧
+  tracking_request --> tracking_check : تلاش مجدد برای کد رهگیری ⟦خودکار⟧
+  tracking_check --> contract_done_with_tracking : کد رهگیری دریافت شد
+  tracking_check --> tracking_error : ثبت خطا و پیگیری رفع مشکل
+  tracking_error --> tracking_request : تلاش مجدد برای دریافت کد رهگیری
+  tracking_error --> contract_rejected : انصراف از کد رهگیری و بستن پرونده
+
+  note right of contract_start
+    منبع حقیقت: workflow-definitions/contract.v1.json
+    نسخه‌ای که پرونده با آن ساخته می‌شود قفل می‌گردد
+  end note

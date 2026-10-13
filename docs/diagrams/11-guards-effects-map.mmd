@@ -1,0 +1,96 @@
+---
+title: نگاشت گاردها و افکت‌ها — کدام کلید در کدام گردش‌کار مصرف می‌شود
+---
+mindmap
+  root((رجیستری دامنه<br/>32 گارد<br/>25 افکت))
+    فرایند قرارداد — contract v1
+      گاردها
+        all_documents_approved
+        attempts_below_limit
+        contract_details_complete
+        contract_document_ready
+        contract_is_rent
+        contract_is_sale
+        has_clause_revision
+        has_reason
+        legal_approved
+        legal_needs_edit
+        legal_rejected
+        payment_result_is
+        payment_succeeded
+        referral_approved
+        signatures_complete
+        subscription_valid
+        tracking_code_received
+        tracking_not_required
+        tracking_required
+      افکت‌ها
+        assign_case_code
+        bump_clause_version
+        close_case
+        consume_referral
+        create_followup_task
+        emit_invoice
+        generate_contract_document
+        increment_attempt
+        notify_parties
+        queue_for_expert
+        record_event
+        record_legal_review
+        record_tracking_code
+        record_tracking_error
+        request_tracking_code
+        send_for_signature
+        set_requires_tracking
+    قالب سایر خدمات — custom_service v1
+      گاردها
+        has_reason
+        service_approved
+        service_finance_ok
+      افکت‌ها
+        close_case
+        create_followup_task
+        emit_invoice
+        notify_parties
+        record_event
+    فرایند آگهی — listing v1
+      گاردها
+        has_reason
+        listing_approved
+        listing_data_complete
+        listing_expired
+        listing_finance_ok
+      افکت‌ها
+        close_case
+        create_followup_task
+        emit_invoice
+        notify_parties
+        publish_listing
+        queue_for_expert
+        record_event
+        unpublish_listing
+    فرایند نیازمندی‌ها — requirements v1
+      گاردها
+        has_reason
+        matches_found
+        requirement_expired
+      افکت‌ها
+        close_case
+        create_followup_task
+        notify_parties
+        record_event
+        set_access_level
+        set_requirement_status
+    وضعیت رجیستری
+      گاردهای بدون مصرف (5)
+        documents_incomplete
+        documents_pending
+        documents_rejected
+        report_decision
+        settlement_method_is
+      افکت‌های بدون مصرف (4)
+        emit_webhook
+        set_due
+        set_priority
+        update_followup_task
+      کلیدهای ناشناس در تعریف‌ها (0)

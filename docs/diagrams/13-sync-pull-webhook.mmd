@@ -1,0 +1,56 @@
+---
+title: سینک Pull و Webhook خروجی — کارهای زمان‌بندی‌شده (cron)
+---
+sequenceDiagram
+  autonumber
+  participant CR as زمان‌بند سرور (cron)
+  participant JP as POST /api/v1/jobs/pull
+  participant JW as POST /api/v1/jobs/dispatch-webhooks
+  participant SY as services/sync.ts
+  participant M as سرور اصلی کارفرما
+  participant DB as SQLite (pull_cursors، outbound_webhooks)
+
+  rect rgb(238, 246, 255)
+    Note over CR,DB: کانال Pull — CRM از سرور اصلی می‌خواند
+    CR->>JP: POST هر ۵ تا ۱۵ دقیقه (با کلید سینک)
+    JP->>JP: بررسی مجوز (کلید/امضا) و SYNC_PULL_ENABLED
+    loop برای هر موجودیت users · contracts · listings · requirements
+      JP->>SY: pullOnce(entity)
+      SY->>DB: getPullCursor(entity) — آخرین زمان واکشی
+      SY->>M: GET {SYNC_PULL_URL}/{entity}?since=… با هدر X-Sync-Key
+      alt پاسخ موفق
+        M-->>SY: {items:[…]}
+        SY->>SY: ingest(entity, payload, {source:"pull"}) — همان مسیر Push
+        SY->>DB: setPullCursor(entity, now)
+        SY-->>JP: ok + خلاصه
+      else خطا یا پاسخ ناموفق
+        M-->>SY: HTTP 4xx/5xx یا خطای شبکه
+        SY-->>JP: ok=false + پیام فارسی (کرسر دست‌نخورده می‌ماند)
+      end
+    end
+    JP-->>CR: جمع‌بندی همه موجودیت‌ها
+  end
+
+  rect rgb(240, 253, 244)
+    Note over CR,DB: کانال Webhook خروجی — CRM رویدادها را می‌فرستد
+    Note over DB: صف از افکت emit_webhook در گذارها پر می‌شود<br/>(بسته‌شدن پرونده، انتشار آگهی، پرداخت، کد رهگیری)
+    CR->>JW: POST هر ۵ دقیقه
+    JW->>SY: dispatchDueWebhooks(limit = 20)
+    SY->>DB: dueWebhooks — status=pending و next_attempt_at سررسیده
+    loop برای هر وب‌هوک سررسیده
+      SY->>SY: انتخاب آدرس — رکورد → تنظیمات پنل (sync.webhookUrl) → WEBHOOK_TARGET_URL
+      SY->>SY: signOutboundPayload → sha256=HMAC(WEBHOOK_SECRET یا SYNC_SECRET)
+      SY->>M: POST {event, data} با هدرهای X-Webhook-Event، X-Webhook-Signature، X-Webhook-Attempt
+      alt پاسخ 2xx
+        M-->>SY: ok
+        SY->>DB: markWebhook(sent)
+      else پاسخ ناموفق یا خطای شبکه
+        M-->>SY: HTTP xxx / timeout
+        SY->>DB: markWebhook(failed, attempts+1, backoff = 2^attempts دقیقه، سقف ۲۴ ساعت)
+        Note over SY,DB: پس از ۵ تلاش ناموفق → dead (قابل تلاش دستی از پنل «وضعیت سینک»)
+      end
+    end
+    JW-->>CR: نتیجه ارسال‌ها
+  end
+
+  Note over CR,DB: هر دو مسیر در sync_log و audit_log ثبت می‌شوند و در پنل «وضعیت سینک» قابل پایش‌اند

@@ -1,0 +1,53 @@
+---
+title: چرخه عمر یک گذار — از کلیک در پنل تا ثبت در دیتابیس و وب‌هوک
+---
+sequenceDiagram
+  autonumber
+  actor U as کارشناس / مدیر
+  participant B as مرورگر (پنل RTL)
+  participant SA as Server Action — src/app/panel/cases/actions.ts
+  participant AU as src/auth — نشست، CSRF، RBAC
+  participant SV as CaseService.applyTransition
+  participant EN as Engine.plan (خالص، بدون I/O)
+  participant DB as مخازن SQLite (src/db/repos)
+  participant AD as آداپتورها + صف وب‌هوک
+
+  U->>B: انتخاب اقدام یا گزینه گذار
+  B->>SA: ارسال فرم با توکن CSRF امضاشده
+  SA->>AU: verifyCsrfToken + requireSession + assertCan
+  AU-->>SA: نقش (staff/admin) و شناسه کارمند
+  SA->>SV: applyTransition(caseId, transitionKey, option, reason, payload, idempotencyKey)
+
+  SV->>DB: loadRuntime(caseId) — وضعیت جهان
+  DB-->>SV: قرارداد، مدارک، امضاها، پرداخت‌ها، رهگیری، وظایف، تنظیمات
+
+  alt کلید idempotency قبلاً دیده شده
+    SV->>DB: getIdempotentResponse
+    DB-->>SV: پاسخ ذخیره‌شده
+    SV-->>SA: بازپخش نتیجه قبلی (بدون اثر دوباره)
+  else درخواست تازه
+    SV->>EN: plan(runtime, transitionKey, option, actor, reason, payload)
+    EN->>EN: اعتبارسنجی گذار (از این حالت ممکن است؟)
+    EN->>EN: canActor — نقش مجاز است؟
+    EN->>EN: گاردهای سطح گذار و سطح گزینه
+    EN->>EN: ساخت ApplyPlan با اجرای افکت‌ها
+    EN->>EN: زنجیره گذارهای auto (حداکثر ۲۵ گام + تشخیص حلقه)
+
+    alt گارد رد شد
+      EN-->>SV: GuardFailedError با پیام فارسی
+      SV-->>SA: خطا
+      SA-->>B: نمایش دلیل (مثلاً «برای اجاره، آدرس ملک و نام مالک الزامی است»)
+      B-->>U: پیام خطا روی همان فرم
+    else گاردها پذیرفتند
+      EN-->>SV: ApplyPlan (casePatch, events, tasks, documents, signatures, invoice, payment, outbound)
+      SV->>DB: یک تراکنش — cases + case_transitions + timeline_events + tasks + documents + signatures + tracking + invoices + payments + audit_log
+      SV->>DB: ذخیره پاسخ idempotency (TTL ۴۸ ساعت)
+      DB-->>SV: commit
+      SV->>AD: پس از تراکنش — ارسال اعلان‌ها و ثبت در notifications
+      SV->>AD: صف‌کردن وب‌هوک خروجی (outbound_webhooks)
+      SV-->>SA: نتیجه (from → to) + runtime تازه
+      SA->>SA: revalidatePath
+      SA-->>B: پیام موفقیت + داده به‌روز
+      B-->>U: وضعیت تازه پرونده، تایم‌لاین و دکمه‌های مجاز
+    end
+  end

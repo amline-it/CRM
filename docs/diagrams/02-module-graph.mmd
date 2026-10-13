@@ -1,0 +1,106 @@
+---
+title: گراف وابستگی ماژول‌ها — استخراج‌شده از import های واقعی src/**
+---
+flowchart LR
+  classDef web fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef app fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
+  classDef dom fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef data fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef sec fill:#fce7f3,stroke:#be185d,color:#831843;
+
+  subgraph SG_web["لایه وب — src/app"]
+    direction TB
+    M_app_root["app — layout و صفحه ریشه<br/><small>2 فایل</small>"]:::web
+    M_app_login["app/login — ورود<br/><small>3 فایل</small>"]:::web
+    M_app_logout["app/logout — خروج<br/><small>1 فایل</small>"]:::web
+    M_app_panel["app/panel — پنل کارکنان<br/><small>21 فایل</small>"]:::web
+    M_app_api["app/api — health و v1<br/><small>5 فایل</small>"]:::web
+  end
+
+  subgraph SG_client["کلاینت مشترک"]
+    direction TB
+    M_components["components/session-bridge<br/><small>2 فایل</small>"]:::web
+  end
+
+  subgraph SG_security["احراز هویت — src/auth"]
+    direction TB
+    M_auth["auth — session/jwt/csrf/rbac/password/ticket<br/><small>7 فایل</small>"]:::sec
+  end
+
+  subgraph SG_app["لایه سرویس — src/services"]
+    direction TB
+    M_services_sync["services/sync.ts<br/><small>1 فایل</small>"]:::app
+    M_services_definitions["services/definitions.ts<br/><small>1 فایل</small>"]:::app
+  end
+
+  subgraph SG_domain["دامنه — src/domain"]
+    direction TB
+    M_domain_service["domain/service — CaseService<br/><small>1 فایل</small>"]:::dom
+    M_domain_workflows["domain/workflows — buildEngine<br/><small>1 فایل</small>"]:::dom
+    M_domain_engine["domain/engine — plan/available/validate<br/><small>3 فایل</small>"]:::dom
+    M_domain_guards["domain/guards<br/><small>1 فایل</small>"]:::dom
+    M_domain_effects["domain/effects<br/><small>1 فایل</small>"]:::dom
+    M_domain_adapters["domain/adapters — پرداخت/رهگیری/اعلان<br/><small>1 فایل</small>"]:::dom
+  end
+
+  subgraph SG_data["داده — src/db"]
+    direction TB
+    M_db_repos["db/repos — cases/catalog/finance/people/platform<br/><small>5 فایل</small>"]:::data
+    M_db_core["db/core — client/migrate<br/><small>2 فایل</small>"]:::data
+  end
+
+  subgraph SG_shared["مشترک"]
+    direction TB
+    M_lib["lib — errors/ids/jalali/money/fa-labels<br/><small>5 فایل</small>"]:::data
+  end
+
+  M_app_api -->|3| M_auth
+  M_app_api -->|5| M_db_core
+  M_app_api ==>|6| M_db_repos
+  M_app_api -->|1| M_domain_workflows
+  M_app_api -->|1| M_lib
+  M_app_api -->|3| M_services_sync
+  M_app_login ==>|6| M_auth
+  M_app_login -->|1| M_components
+  M_app_login -->|2| M_db_core
+  M_app_login -->|3| M_db_repos
+  M_app_logout -->|1| M_auth
+  M_app_panel ==>|29| M_auth
+  M_app_panel -->|1| M_components
+  M_app_panel -->|1| M_db_core
+  M_app_panel ==>|46| M_db_repos
+  M_app_panel -->|3| M_domain_engine
+  M_app_panel -->|2| M_domain_service
+  M_app_panel ==>|8| M_domain_workflows
+  M_app_panel ==>|45| M_lib
+  M_app_panel -->|1| M_services_definitions
+  M_app_panel -->|2| M_services_sync
+  M_app_root -->|1| M_auth
+  M_app_root -->|1| M_components
+  M_auth -->|2| M_db_repos
+  M_auth -->|4| M_lib
+  M_db_repos -->|5| M_db_core
+  M_db_repos -->|5| M_lib
+  M_domain_adapters -->|1| M_lib
+  M_domain_effects -->|1| M_domain_engine
+  M_domain_effects -->|1| M_lib
+  M_domain_engine -->|1| M_lib
+  M_domain_guards -->|1| M_domain_engine
+  M_domain_service -->|1| M_db_core
+  M_domain_service -->|5| M_db_repos
+  M_domain_service -->|1| M_domain_adapters
+  M_domain_service -->|1| M_domain_engine
+  M_domain_service -->|1| M_domain_workflows
+  M_domain_service -->|3| M_lib
+  M_domain_workflows -->|1| M_domain_effects
+  M_domain_workflows -->|3| M_domain_engine
+  M_domain_workflows -->|1| M_domain_guards
+  M_lib -->|1| M_domain_engine
+  M_services_definitions -->|1| M_db_core
+  M_services_definitions -->|2| M_db_repos
+  M_services_definitions -->|1| M_domain_workflows
+  M_services_sync -->|1| M_db_core
+  M_services_sync -->|5| M_db_repos
+  M_services_sync -->|1| M_domain_service
+  M_services_sync -->|1| M_domain_workflows
+  M_services_sync -->|2| M_lib

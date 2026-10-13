@@ -1,0 +1,66 @@
+---
+title: درون موتور گردش‌کار — Engine.plan و زنجیره گذارهای خودکار
+---
+flowchart TD
+  classDef ok fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef err fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+  classDef proc fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+  classDef dec fill:#fef3c7,stroke:#b45309,color:#78350f;
+  classDef pure fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
+
+  In(["ورودی: ApplyInput<br/>runtime + transitionKey + option + actor + reason + payload"]):::proc
+
+  In --> T1{"گذار با این کلید<br/>در تعریف وجود دارد؟"}:::dec
+  T1 -->|نه| E1["AppError INVALID_TRANSITION<br/>«گذار … در این گردش‌کار وجود ندارد»"]:::err
+  T1 -->|بله| T2{"runtime.state<br/>در tr.from هست؟"}:::dec
+  T2 -->|نه| E2["AppError INVALID_TRANSITION<br/>«این گذار از وضعیت … امکان‌پذیر نیست»"]:::err
+  T2 -->|بله| T3{"canActor<br/>نقش/مبدأ مجاز است؟"}:::dec
+  T3 -->|نه| E3["AppError FORBIDDEN<br/>پیام فارسی نقش مجاز"]:::err
+  T3 -->|بله| G1{"گاردهای سطح گذار<br/>همه قبول‌اند؟"}:::dec
+  G1 -->|نه| E4["GuardFailedError<br/>پیام فارسی گارد + withReason"]:::err
+  G1 -->|بله| K1{"kind == choice ؟"}:::dec
+
+  K1 -->|بله| O1{"گزینه انتخاب شده<br/>و تعریف‌شده است؟"}:::dec
+  O1 -->|نه| E5["AppError VALIDATION<br/>«باید یکی از گزینه‌ها انتخاب شود»"]:::err
+  O1 -->|بله| G2{"گاردهای سطح گزینه"}:::dec
+  G2 -->|رد| E4
+  G2 -->|قبول| P1
+  K1 -->|خیر| P1["planSingle<br/>مقصد = tr.to"]:::pure
+
+  P1 --> FX["اجرای افکت‌ها روی ApplyPlan<br/>transition.effects سپس option.effects<br/>record_event · create_followup_task · emit_invoice · …"]:::pure
+  FX --> PATCH["applyPatchToRuntime<br/>پچ نقشه روی وضعیت جهان (برای گاردهای گام بعد)"]:::pure
+
+  PATCH --> LOOP{"گذار auto با actors=system<br/>از حالت فعلی وجود دارد؟"}:::dec
+  LOOP -->|نه| FIN
+  LOOP -->|بله| STEP{"گام < ۲۵ ؟"}:::dec
+  STEP -->|نه — سقف زنجیره| FIN
+  STEP -->|بله| GC{"گاردهای نامزد auto<br/>قبول‌اند؟"}:::dec
+  GC -->|هیچ‌کدام| W1["plan.warnings += «گذار خودکار عبور نکرد»"]:::err
+  W1 --> FIN
+  GC -->|بله| CYC{"امضا state:transition<br/>قبلاً دیده شده؟"}:::dec
+  CYC -->|بله| W2["plan.warnings += «حلقه خودکار شناسایی شد»"]:::err
+  W2 --> FIN
+  CYC -->|نه| MERGE["ادغام نقشه خودکار در نقشه اصلی<br/>to · events · tasks · documents · signatures · outbound<br/>mergeCasePatch"]:::pure
+  MERGE --> LOOP
+
+  FIN{"حالت مقصد terminal است؟"}:::dec
+  FIN -->|بله| TERM["اجرای crm.onTerminal<br/>outcome + status = closed"]:::ok
+  FIN -->|نه| OUT
+  TERM --> OUT(["خروجی: ApplyPlan<br/>casePatch · events · tasks · notifications · documents · signatures<br/>trackingRequest · invoice · payment · outbound · traces · warnings"]):::ok
+
+  subgraph VAL["اعتبارسنجی تعریف — validate.ts (هنگام import/seed از پنل)"]
+    direction TB
+    V1["حالت تکراری یا گذار بی‌مرجع"]:::dec
+    V2["حالت بن‌بست (بدون خروجی و غیر terminal)"]:::dec
+    V3["گذار auto بدون نقش سیستمی"]:::dec
+    V4["کلید گارد یا افکت ناشناس"]:::dec
+  end
+  VAL -.->|"assertValidDefinition پیش از فعال‌سازی نسخه"| In
+
+  subgraph AVAIL["Engine.available — ساخت دکمه‌های پنل"]
+    direction TB
+    A1["فقط گذارهای from == state فعلی"]:::pure
+    A2["گذارهای auto حذف می‌شوند (خودکار اجرا می‌شوند)"]:::pure
+    A3["برای هر گذار: canActor + گاردها → allowed/reason"]:::pure
+    A4["برای choice: وضعیت مجاز هر گزینه جداگانه"]:::pure
+  end

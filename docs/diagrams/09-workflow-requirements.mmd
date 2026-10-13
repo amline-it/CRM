@@ -1,0 +1,34 @@
+---
+title: فرایند نیازمندی‌ها (requirements v1) — 7 حالت و 7 گذار
+---
+stateDiagram-v2
+  direction TB
+  state "ثبت نیازمندی ⟦آغاز⟧<br/>requirements_start" as requirements_start
+  state "نمایش نیازمندی‌ها طبق دسترسی<br/>requirements_visible" as requirements_visible
+  state "تطبیق با آگهی‌های موجود<br/>requirements_matching" as requirements_matching
+  state "ارائه پیشنهادها<br/>requirements_matched" as requirements_matched
+  state "نیازمندی تأمین شد ⟦پایانی⟧<br/>requirements_fulfilled" as requirements_fulfilled
+  state "انقضای نیازمندی ⟦پایانی⟧<br/>requirements_expired" as requirements_expired
+  state "لغو توسط متقاضی ⟦پایانی⟧<br/>requirements_cancelled" as requirements_cancelled
+
+  [*] --> requirements_start
+  requirements_fulfilled --> [*]
+  requirements_expired --> [*]
+  requirements_cancelled --> [*]
+
+  requirements_start --> requirements_visible : تعیین سطح دسترسی نمایش ▸ عمومی ⟦انتخابی⟧
+  requirements_start --> requirements_visible : تعیین سطح دسترسی نمایش ▸ فقط مشاوران املاک ⟦انتخابی⟧
+  requirements_start --> requirements_visible : تعیین سطح دسترسی نمایش ▸ فقط کارکنان CRM ⟦انتخابی⟧
+  requirements_visible --> requirements_matching : تطبیق با آگهی‌ها
+  requirements_matching --> requirements_matched : ارائه پیشنهادهای تطبیق‌یافته
+  requirements_matched --> requirements_visible : بازگشت به نمایش عمومی
+  requirements_matched --> requirements_fulfilled : تأمین نیازمندی
+  requirements_visible --> requirements_expired : انقضای نیازمندی ⟦خودکار⟧
+  requirements_matched --> requirements_expired : انقضای نیازمندی ⟦خودکار⟧
+  requirements_visible --> requirements_cancelled : لغو توسط متقاضی
+  requirements_matched --> requirements_cancelled : لغو توسط متقاضی
+
+  note right of requirements_start
+    منبع حقیقت: workflow-definitions/requirements.v1.json
+    نسخه‌ای که پرونده با آن ساخته می‌شود قفل می‌گردد
+  end note

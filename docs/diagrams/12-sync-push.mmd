@@ -1,0 +1,69 @@
+---
+title: سینک Push (اینگست) — سرور اصلی داده را به CRM می‌فرستد
+---
+sequenceDiagram
+  autonumber
+  participant M as سرور اصلی کارفرما
+  participant R as POST /api/v1/ingest/[entity]
+  participant SY as services/sync.ts
+  participant PL as repos/platform (sync_log، idempotency)
+  participant CS as CaseService / repos
+  participant DB as SQLite
+
+  M->>R: POST با هدرهای X-Sync-Key، X-Signature، X-Idempotency-Key، X-Sync-Source
+  Note over M,R: بدنه = {"source":"main-server","items":[...]}<br/>امضا = sha256=HMAC-SHA256(SYNC_SECRET, rawBody)
+
+  R->>R: ensureMigrated + اعتبارسنجی نام موجودیت
+  alt موجودیت نامعتبر
+    R-->>M: 404 SYNC_INVALID — مقادیر مجاز users/contracts/listings/requirements
+  end
+
+  R->>SY: checkIngestAuth(headers, rawBody)
+  SY->>SY: مقایسه کلید با SYNC_API_KEY
+  SY->>SY: verifySignature با timingSafeEqual
+  alt SYNC_API_KEY تنظیم نشده
+    SY-->>R: 503 — سینک پیکربندی نشده
+    R-->>M: 503
+  else کلید یا امضا نامعتبر
+    SY-->>R: 401 — کلید/امضای نامعتبر
+    R-->>M: 401
+  else معتبر
+    SY-->>R: ok
+
+    opt کلید idempotency ارسال شده
+      R->>PL: getIdempotentResponse(key)
+      PL->>DB: SELECT از idempotency_keys (TTL ۴۸ ساعت)
+      alt پاسخ قبلی موجود است
+        PL-->>R: پاسخ ذخیره‌شده
+        R-->>M: 200 {ok:true, replayed:true, …} — بدون اثر دوباره
+      end
+    end
+
+    R->>SY: parseBody(rawBody) سپس ingest(entity, body, headers)
+    SY->>PL: ثبت sync_log (entity، source، تعداد آیتم‌ها)
+
+    loop برای هر آیتم (خطای یک رکورد بقیه را متوقف نمی‌کند)
+      SY->>SY: نرمال‌سازی camelCase/snake_case و اعتبارسنجی فیلدها
+      alt entity = users
+        SY->>CS: upsert کاربر با کلید یکتا (source, external_id)
+      else entity = contracts
+        SY->>CS: upsert کاربر طرفین + upsertSyncedCase + جزئیات قرارداد
+        CS->>DB: ساخت/به‌روزرسانی پرونده با نسخه گردش‌کار قفل‌شده
+      else entity = listings
+        SY->>CS: upsert پرونده آگهی + رکورد listings
+      else entity = requirements
+        SY->>CS: upsert پرونده نیازمندی + رکورد requirements
+      end
+      CS-->>SY: action = created / updated / unchanged / rejected
+      SY->>PL: ثبت sync_item_results
+    end
+
+    SY->>PL: writeAudit + به‌روزرسانی خلاصه sync_log
+    opt کلید idempotency ارسال شده
+      SY->>PL: saveIdempotentResponse(key, نتیجه)
+    end
+    SY-->>R: IngestResult
+    R-->>M: 200 {ok, entity, summary, items, syncLogId}
+  end
+
+  Note over M,DB: اگر گذاری triggerEvent داشته باشد، رویداد بیرونی می‌تواند پرونده را پیش ببرد (origin=partner/either)

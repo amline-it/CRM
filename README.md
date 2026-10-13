@@ -56,6 +56,9 @@ docker compose up -d --build
 | `npm run migrate` | اعمال مهاجرت‌های SQL (`-- --status` برای مشاهده وضعیت) |
 | `npm run seed` | ثبت تعریف‌های گردش‌کار، خدمات و (با `--demo`) داده نمونه |
 | `npm run lint` | بررسی نوع‌ها با TypeScript |
+| `npm run diagrams` | بازتولید دیاگرام‌های Mermaid داده‌محور + نمایه `docs/diagrams/README.md` |
+| `npm run diagrams:check` | بررسی هم‌خوانی دیاگرام‌های تولیدی با کد (بدون نوشتن) |
+| `npm run diagrams:view` | مرورگر محلی دیاگرام‌ها روی `http://localhost:4321` (بزرگ‌نمایی + خروجی SVG/PNG) |
 
 ## معماری (خلاصه)
 
@@ -72,7 +75,26 @@ src/app/api/v1/        API سینک با سرور اصلی + cron وب‌هوک 
 workflow-definitions/  منبع حقیقت گردش‌کارها (قرارداد، آگهی، نیازمندی، خدمت سفارشی)
 ```
 
-مستندات بیشتر: `docs/architecture.md` · `docs/sync-api.md` (قرارداد API برای سرور شما) · `docs/deployment.md` ·
+### دیاگرام‌ها (Mermaid)
+
+۱۶ دیاگرام پروژه در [`docs/diagrams/`](docs/diagrams/README.md) قرار دارد — معماری، گراف وابستگی ماژول‌ها،
+ERD کامل (۳۱ جدول)، چرخه عمر گذار، منطق موتور، حالت‌های هر چهار گردش‌کار، نگاشت گاردها/افکت‌ها،
+سه کانال سینک، احراز هویت/RBAC، نقشه پنل و استقرار. هر دیاگرام دو شکل دارد:
+
+* فایل خام `*.mmd` (قابل استفاده در Mermaid Live Editor و CI)
+* همان دیاگرام داخل `docs/diagrams/README.md` — GitHub آن را به‌صورت تصویر رندر می‌کند
+
+دیاگرام‌های ERD، گراف ماژول‌ها، گردش‌کارها و نگاشت گاردها **تولیدی**اند و از منبع حقیقت
+(`migrations/`، `src/**`، `workflow-definitions/*.json`) ساخته می‌شوند:
+
+```bash
+npm run diagrams          # بازتولید + به‌روزرسانی نمایه
+npm run diagrams:check    # فقط بررسی هم‌خوانی (برای CI)
+npm run diagrams:view     # مرور در مرورگر با بزرگ‌نمایی و خروجی SVG/PNG
+```
+
+مستندات بیشتر: `docs/architecture.md` · `docs/diagrams/README.md` (دیاگرام‌ها) ·
+`docs/sync-api.md` (قرارداد API برای سرور شما) · `docs/deployment.md` ·
 `docs/fa/راهنمای-کاربری.md` · طراحی کامل: `docs/superpowers/specs/2026-10-13-crm-design.md`.
 
 ## امنیت
