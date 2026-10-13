@@ -1,0 +1,1613 @@
+{
+  "key": "contract",
+  "version": 1,
+  "name": "فرایند قرارداد",
+  "description": "پرونده قرارداد اجاره یا خرید و فروش، از انتخاب نوع تا امضا و کد رهگیری. مطابق فلوچارت Crm7LIght (زیرگراف ۲).",
+  "context": "contract",
+  "initial": "contract_start",
+  "roles": {
+    "staff": "کارمند/کارشناس CRM",
+    "admin": "مدیر",
+    "system": "موتور و رویدادهای همگام‌سازی سمت سرور اصلی"
+  },
+  "states": [
+    {
+      "key": "contract_start",
+      "name": "شروع پرونده قرارداد",
+      "type": "start",
+      "node": "A"
+    },
+    {
+      "key": "rent_info",
+      "name": "ثبت اطلاعات اجاره",
+      "type": "process",
+      "node": "I"
+    },
+    {
+      "key": "sale_info",
+      "name": "ثبت اطلاعات خرید و فروش",
+      "type": "process",
+      "node": "J"
+    },
+    {
+      "key": "output_choice",
+      "name": "تعیین خروجی موردنیاز",
+      "type": "decision",
+      "node": "K"
+    },
+    {
+      "key": "no_tracking",
+      "name": "بدون کد رهگیری",
+      "type": "process",
+      "node": "L"
+    },
+    {
+      "key": "with_tracking",
+      "name": "با درخواست کد رهگیری",
+      "type": "process",
+      "node": "M"
+    },
+    {
+      "key": "case_created",
+      "name": "تشکیل پرونده خدمت",
+      "type": "process",
+      "node": "N"
+    },
+    {
+      "key": "finance_check",
+      "name": "بررسی شرایط مالی مختص همین خدمت",
+      "type": "decision",
+      "node": "O"
+    },
+    {
+      "key": "payment_direct",
+      "name": "پرداخت مستقیم",
+      "type": "decision",
+      "node": "Q"
+    },
+    {
+      "key": "subscription_check",
+      "name": "اشتراک برای این خدمت معتبر است؟",
+      "type": "decision",
+      "node": "R"
+    },
+    {
+      "key": "referral_check",
+      "name": "شرایط ریفرال یا معافیت تأیید شده است؟",
+      "type": "decision",
+      "node": "S"
+    },
+    {
+      "key": "payment_error",
+      "name": "ثبت خطا و پیگیری پرداخت",
+      "type": "error",
+      "node": "Q1",
+      "loop": "payment_direct"
+    },
+    {
+      "key": "finance_ok",
+      "name": "تأیید وضعیت مالی",
+      "type": "process",
+      "node": "T"
+    },
+    {
+      "key": "documents_review",
+      "name": "بررسی مدارک قرارداد",
+      "type": "decision",
+      "node": "V"
+    },
+    {
+      "key": "documents_incomplete",
+      "name": "اعلام مدارک موردنیاز",
+      "type": "error",
+      "node": "V1"
+    },
+    {
+      "key": "documents_rejected",
+      "name": "اعلام دلیل رد و درخواست اصلاح",
+      "type": "error",
+      "node": "V2"
+    },
+    {
+      "key": "documents_pending_queue",
+      "name": "صف بررسی کارشناس",
+      "type": "process",
+      "node": "V3"
+    },
+    {
+      "key": "sale_branch",
+      "name": "نوع قرارداد خرید و فروش است؟",
+      "type": "decision",
+      "node": "W"
+    },
+    {
+      "key": "legal_review",
+      "name": "بررسی حقوقی",
+      "type": "process",
+      "node": "LEG"
+    },
+    {
+      "key": "legal_result",
+      "name": "نتیجه بررسی حقوقی",
+      "type": "decision",
+      "node": "LEGRESULT"
+    },
+    {
+      "key": "clause_edit",
+      "name": "اصلاح بندهای قرارداد",
+      "type": "process",
+      "node": "EDIT"
+    },
+    {
+      "key": "contract_rejected",
+      "name": "ثبت رد و دلیل آن",
+      "type": "error",
+      "node": "REJECT",
+      "terminal": true
+    },
+    {
+      "key": "clause_edit_decision",
+      "name": "نیاز به ویرایش بند دارد؟",
+      "type": "decision",
+      "node": "X"
+    },
+    {
+      "key": "signature_prep",
+      "name": "آماده‌سازی برای امضا",
+      "type": "process",
+      "node": "SIGNPREP"
+    },
+    {
+      "key": "signature_collect",
+      "name": "ارسال و پیگیری امضای طرفین",
+      "type": "process",
+      "node": "SIGN"
+    },
+    {
+      "key": "signature_check",
+      "name": "امضاهای لازم کامل و معتبرند؟",
+      "type": "decision",
+      "node": "SIGNOK"
+    },
+    {
+      "key": "signature_followup",
+      "name": "پیگیری امضاهای باقی‌مانده",
+      "type": "error",
+      "node": "SIGNFOLLOW",
+      "loop": "signature_collect"
+    },
+    {
+      "key": "tracking_decision",
+      "name": "کد رهگیری درخواست شده است؟",
+      "type": "decision",
+      "node": "TRACK"
+    },
+    {
+      "key": "contract_done_no_tracking",
+      "name": "اتمام قرارداد با امضا، بدون کد رهگیری",
+      "type": "terminal",
+      "node": "DONE1",
+      "outcome": "completed"
+    },
+    {
+      "key": "tracking_request",
+      "name": "ارسال درخواست کد رهگیری",
+      "type": "process",
+      "node": "TRACKREQ"
+    },
+    {
+      "key": "tracking_check",
+      "name": "کد رهگیری دریافت شده؟",
+      "type": "decision",
+      "node": "TRACKOK"
+    },
+    {
+      "key": "tracking_error",
+      "name": "ثبت خطا و پیگیری رفع مشکل",
+      "type": "error",
+      "node": "TRACKERR",
+      "loop": "tracking_request"
+    },
+    {
+      "key": "contract_done_with_tracking",
+      "name": "ثبت کد رهگیری و اتمام قرارداد",
+      "type": "terminal",
+      "node": "DONE2",
+      "outcome": "completed"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "choose_contract_type",
+      "name": "انتخاب نوع قرارداد",
+      "from": [
+        "contract_start"
+      ],
+      "kind": "choice",
+      "origin": "partner",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "contract.type_selected",
+      "options": [
+        {
+          "value": "rent",
+          "label": "اجاره",
+          "to": "rent_info",
+          "effects": [
+            {
+              "key": "record_event",
+              "params": {
+                "kind": "contract.type.rent"
+              }
+            }
+          ]
+        },
+        {
+          "value": "sale",
+          "label": "خرید و فروش",
+          "to": "sale_info",
+          "effects": [
+            {
+              "key": "record_event",
+              "params": {
+                "kind": "contract.type.sale"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "rent_info_submitted",
+      "name": "ثبت اطلاعات اجاره",
+      "from": [
+        "rent_info"
+      ],
+      "to": "output_choice",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "contract_details_complete",
+          "params": {
+            "type": "rent"
+          }
+        }
+      ],
+      "triggerEvent": "contract.rent_info_submitted",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "contract.rent_info_submitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "sale_info_submitted",
+      "name": "ثبت اطلاعات خرید و فروش",
+      "from": [
+        "sale_info"
+      ],
+      "to": "output_choice",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "contract_details_complete",
+          "params": {
+            "type": "sale"
+          }
+        }
+      ],
+      "triggerEvent": "contract.sale_info_submitted",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "contract.sale_info_submitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "choose_output",
+      "name": "تعیین خروجی موردنیاز",
+      "from": [
+        "output_choice"
+      ],
+      "kind": "choice",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "contract.output_selected",
+      "options": [
+        {
+          "value": "signature_only",
+          "label": "فقط امضا",
+          "to": "no_tracking",
+          "effects": [
+            {
+              "key": "set_requires_tracking",
+              "params": {
+                "value": false
+              }
+            }
+          ]
+        },
+        {
+          "value": "signature_and_tracking",
+          "label": "امضا و کد رهگیری",
+          "to": "with_tracking",
+          "effects": [
+            {
+              "key": "set_requires_tracking",
+              "params": {
+                "value": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "create_service_case",
+      "name": "تشکیل پرونده خدمت",
+      "from": [
+        "no_tracking",
+        "with_tracking"
+      ],
+      "to": "case_created",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "assign_case_code",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "case.created"
+          }
+        },
+        {
+          "key": "emit_invoice",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "enter_finance_check",
+      "name": "ورود به بررسی شرایط مالی",
+      "from": [
+        "case_created"
+      ],
+      "to": "finance_check",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.check_started",
+            "title": "بررسی شرایط مالی آغاز شد"
+          }
+        }
+      ]
+    },
+    {
+      "key": "select_settlement",
+      "name": "انتخاب روش تسویه",
+      "from": [
+        "finance_check"
+      ],
+      "kind": "choice",
+      "origin": "partner",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "finance.settlement_selected",
+      "options": [
+        {
+          "value": "direct",
+          "label": "پرداخت مستقیم",
+          "to": "payment_direct"
+        },
+        {
+          "value": "subscription",
+          "label": "اشتراک",
+          "to": "subscription_check"
+        },
+        {
+          "value": "referral",
+          "label": "ریفرال یا معافیت",
+          "to": "referral_check"
+        },
+        {
+          "value": "free",
+          "label": "بدون نیاز به پرداخت",
+          "to": "finance_ok",
+          "effects": [
+            {
+              "key": "record_event",
+              "params": {
+                "kind": "finance.free"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "payment_succeeded",
+      "name": "پرداخت موفق",
+      "from": [
+        "payment_direct",
+        "payment_error",
+        "subscription_check",
+        "referral_check"
+      ],
+      "to": "finance_ok",
+      "kind": "auto",
+      "origin": "partner",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "payment_succeeded",
+          "params": {}
+        }
+      ],
+      "triggerEvent": "payment.succeeded",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.payment.paid"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "payment_received"
+          }
+        }
+      ]
+    },
+    {
+      "key": "payment_failed",
+      "name": "ثبت خطا و پیگیری پرداخت",
+      "from": [
+        "payment_direct",
+        "subscription_check",
+        "referral_check"
+      ],
+      "to": "payment_error",
+      "kind": "auto",
+      "origin": "partner",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "triggerEvent": "payment.failed",
+      "effects": [
+        {
+          "key": "increment_attempt",
+          "params": {
+            "counter": "payment"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.payment.failed"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری پرداخت ناموفق",
+            "priority": "high",
+            "dueInHours": 4
+          }
+        }
+      ],
+      "guards": [
+        {
+          "key": "payment_result_is",
+          "params": {
+            "status": "failed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "payment_retry",
+      "name": "تلاش مجدد پرداخت",
+      "from": [
+        "payment_error"
+      ],
+      "to": "payment_direct",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "attempts_below_limit",
+          "params": {
+            "counter": "payment",
+            "limit": 5
+          }
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.payment.retry"
+          }
+        }
+      ]
+    },
+    {
+      "key": "payment_abort",
+      "name": "انصراف از پرداخت و بستن پرونده",
+      "from": [
+        "payment_error"
+      ],
+      "to": "contract_rejected",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "case.aborted"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "aborted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "subscription_valid",
+      "name": "اشتراک معتبر است",
+      "from": [
+        "subscription_check"
+      ],
+      "to": "finance_ok",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "subscription_valid",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.subscription.used"
+          }
+        }
+      ]
+    },
+    {
+      "key": "subscription_invalid",
+      "name": "اشتراک معتبر نیست — هدایت به پرداخت مستقیم",
+      "from": [
+        "subscription_check"
+      ],
+      "to": "payment_direct",
+      "kind": "action",
+      "origin": "system",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "subscription_valid",
+          "negate": true
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.subscription.invalid"
+          }
+        }
+      ]
+    },
+    {
+      "key": "referral_approved",
+      "name": "ریفرال یا معافیت تأیید شد",
+      "from": [
+        "referral_check"
+      ],
+      "to": "finance_ok",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "referral_approved",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.referral.approved"
+          }
+        },
+        {
+          "key": "consume_referral",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "referral_rejected",
+      "name": "ریفرال یا معافیت تأیید نشد — هدایت به پرداخت مستقیم",
+      "from": [
+        "referral_check"
+      ],
+      "to": "payment_direct",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "referral_approved",
+          "negate": true
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "finance.referral.rejected"
+          }
+        }
+      ]
+    },
+    {
+      "key": "start_documents_review",
+      "name": "بررسی مدارک قرارداد",
+      "from": [
+        "finance_ok"
+      ],
+      "to": "documents_review",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "queue_for_expert",
+          "params": {
+            "queue": "documents"
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_incomplete",
+      "name": "اعلام مدارک موردنیاز",
+      "from": [
+        "documents_review"
+      ],
+      "to": "documents_incomplete",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.incomplete"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "documents_required"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری تکمیل مدارک",
+            "priority": "high",
+            "dueInHours": 24
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_rejected",
+      "name": "اعلام دلیل رد و درخواست اصلاح",
+      "from": [
+        "documents_review"
+      ],
+      "to": "documents_rejected",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.rejected"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "documents_rejected"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری اصلاح مدارک",
+            "priority": "high",
+            "dueInHours": 24
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_resubmitted",
+      "name": "بارگذاری یا اصلاح مدارک",
+      "from": [
+        "documents_incomplete",
+        "documents_rejected"
+      ],
+      "to": "documents_review",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "documents.submitted",
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.resubmitted"
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_pending",
+      "name": "ارسال به صف بررسی کارشناس",
+      "from": [
+        "documents_review"
+      ],
+      "to": "documents_pending_queue",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "triggerEvent": "documents.submitted",
+      "effects": [
+        {
+          "key": "queue_for_expert",
+          "params": {
+            "queue": "documents"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.pending"
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_expert_decided",
+      "name": "ثبت نتیجه بررسی مدارک توسط کارشناس",
+      "from": [
+        "documents_pending_queue"
+      ],
+      "to": "documents_review",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.reviewed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "documents_all_approved",
+      "name": "تأیید همه مدارک",
+      "from": [
+        "documents_review"
+      ],
+      "to": "sale_branch",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "all_documents_approved",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "documents.approved"
+          }
+        }
+      ]
+    },
+    {
+      "key": "branch_sale",
+      "name": "خرید و فروش — بررسی حقوقی",
+      "from": [
+        "sale_branch"
+      ],
+      "to": "legal_review",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "contract_is_sale",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "queue_for_expert",
+          "params": {
+            "queue": "legal"
+          }
+        }
+      ]
+    },
+    {
+      "key": "branch_rent",
+      "name": "اجاره — تصمیم ویرایش بند",
+      "from": [
+        "sale_branch"
+      ],
+      "to": "clause_edit_decision",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "contract_is_rent",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "clause_edit_needed",
+      "name": "نیاز به ویرایش بند دارد",
+      "from": [
+        "clause_edit_decision"
+      ],
+      "to": "legal_review",
+      "kind": "choice",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "options": [
+        {
+          "value": "needed",
+          "label": "بله — ارجاع به بررسی حقوقی",
+          "to": "legal_review",
+          "effects": [
+            {
+              "key": "queue_for_expert",
+              "params": {
+                "queue": "legal"
+              }
+            }
+          ]
+        },
+        {
+          "value": "not_needed",
+          "label": "خیر — آماده‌سازی امضا",
+          "to": "signature_prep",
+          "effects": [
+            {
+              "key": "record_event",
+              "params": {
+                "kind": "clause.no_edit_needed"
+              }
+            },
+            {
+              "key": "generate_contract_document",
+              "params": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "legal_result_ready",
+      "name": "آماده ثبت نتیجه بررسی حقوقی",
+      "from": [
+        "legal_review"
+      ],
+      "to": "legal_result",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "legal.review_started"
+          }
+        }
+      ]
+    },
+    {
+      "key": "legal_approved",
+      "name": "تأیید بررسی حقوقی",
+      "from": [
+        "legal_result"
+      ],
+      "to": "signature_prep",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "legal_approved",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_legal_review",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "legal.approved"
+          }
+        },
+        {
+          "key": "generate_contract_document",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "key": "legal_needs_edit",
+      "name": "نیاز به اصلاح بند",
+      "from": [
+        "legal_result"
+      ],
+      "to": "clause_edit",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "legal_needs_edit",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_legal_review",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "legal.edit_requested"
+          }
+        }
+      ]
+    },
+    {
+      "key": "legal_rejected",
+      "name": "رد قرارداد در بررسی حقوقی",
+      "from": [
+        "legal_result"
+      ],
+      "to": "contract_rejected",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "legal_rejected",
+          "params": {},
+          "withReason": true
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_legal_review",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "legal.rejected"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "contract_rejected"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "rejected"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری رد قرارداد و اطلاع طرفین",
+            "priority": "medium",
+            "dueInHours": 48
+          }
+        }
+      ]
+    },
+    {
+      "key": "clause_edit_done",
+      "name": "اصلاح بندهای قرارداد",
+      "from": [
+        "clause_edit"
+      ],
+      "to": "legal_review",
+      "kind": "action",
+      "origin": "either",
+      "actors": [
+        "staff",
+        "admin",
+        "system"
+      ],
+      "guards": [
+        {
+          "key": "has_clause_revision",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "bump_clause_version",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "clause.revised"
+          }
+        }
+      ]
+    },
+    {
+      "key": "start_signature",
+      "name": "ارسال و پیگیری امضای طرفین",
+      "from": [
+        "signature_prep"
+      ],
+      "to": "signature_collect",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "contract_document_ready",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "send_for_signature",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "signature.sent"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "signature_request"
+          }
+        }
+      ]
+    },
+    {
+      "key": "signature_check_done",
+      "name": "بررسی وضعیت امضاها",
+      "from": [
+        "signature_collect",
+        "signature_followup"
+      ],
+      "to": "signature_check",
+      "kind": "action",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "triggerEvent": "signature.updated"
+    },
+    {
+      "key": "signatures_incomplete",
+      "name": "پیگیری امضاهای باقی‌مانده",
+      "from": [
+        "signature_check"
+      ],
+      "to": "signature_followup",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "signatures_complete",
+          "negate": true
+        }
+      ],
+      "effects": [
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "signature_reminder"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری امضاهای باقی‌مانده",
+            "priority": "high",
+            "dueInHours": 12
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "signature.reminder"
+          }
+        }
+      ]
+    },
+    {
+      "key": "signatures_complete",
+      "name": "همه امضاها کامل و معتبر",
+      "from": [
+        "signature_check"
+      ],
+      "to": "tracking_decision",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "signatures_complete",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "signature.complete"
+          }
+        }
+      ]
+    },
+    {
+      "key": "finish_without_tracking",
+      "name": "اتمام قرارداد بدون کد رهگیری",
+      "from": [
+        "tracking_decision"
+      ],
+      "to": "contract_done_no_tracking",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "tracking_not_required",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "contract.completed.signature_only"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "request_tracking_code",
+      "name": "ارسال درخواست کد رهگیری",
+      "from": [
+        "tracking_decision"
+      ],
+      "to": "tracking_request",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "tracking_required",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "request_tracking_code",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "tracking.requested"
+          }
+        }
+      ]
+    },
+    {
+      "key": "tracking_retry",
+      "name": "تلاش مجدد برای کد رهگیری",
+      "from": [
+        "tracking_request"
+      ],
+      "to": "tracking_check",
+      "kind": "auto",
+      "origin": "system",
+      "actors": [
+        "system",
+        "staff",
+        "admin"
+      ],
+      "triggerEvent": "tracking.updated"
+    },
+    {
+      "key": "tracking_received",
+      "name": "کد رهگیری دریافت شد",
+      "from": [
+        "tracking_check"
+      ],
+      "to": "contract_done_with_tracking",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "tracking_code_received",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_tracking_code",
+          "params": {}
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "tracking.received"
+          }
+        },
+        {
+          "key": "notify_parties",
+          "params": {
+            "template": "tracking_code_issued"
+          }
+        },
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "key": "tracking_failed",
+      "name": "ثبت خطا و پیگیری رفع مشکل",
+      "from": [
+        "tracking_check"
+      ],
+      "to": "tracking_error",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_tracking_error",
+          "params": {}
+        },
+        {
+          "key": "increment_attempt",
+          "params": {
+            "counter": "tracking"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "tracking.error"
+          }
+        },
+        {
+          "key": "create_followup_task",
+          "params": {
+            "title": "پیگیری خطای کد رهگیری",
+            "priority": "high",
+            "dueInHours": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "tracking_retry_request",
+      "name": "تلاش مجدد برای دریافت کد رهگیری",
+      "from": [
+        "tracking_error"
+      ],
+      "to": "tracking_request",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "staff",
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "attempts_below_limit",
+          "params": {
+            "counter": "tracking",
+            "limit": 5
+          }
+        }
+      ],
+      "effects": [
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "tracking.requested"
+          }
+        }
+      ]
+    },
+    {
+      "key": "tracking_abort",
+      "name": "انصراف از کد رهگیری و بستن پرونده",
+      "from": [
+        "tracking_error"
+      ],
+      "to": "contract_rejected",
+      "kind": "action",
+      "origin": "crm",
+      "actors": [
+        "admin"
+      ],
+      "guards": [
+        {
+          "key": "has_reason",
+          "params": {}
+        }
+      ],
+      "effects": [
+        {
+          "key": "close_case",
+          "params": {
+            "outcome": "aborted"
+          }
+        },
+        {
+          "key": "record_event",
+          "params": {
+            "kind": "tracking.aborted"
+          }
+        }
+      ]
+    }
+  ],
+  "crm": {
+    "onTerminal": [
+      {
+        "key": "record_event",
+        "params": {
+          "kind": "crm.timeline"
+        }
+      },
+      {
+        "key": "create_followup_task",
+        "params": {
+          "when": "needsFollowup",
+          "title": "پیگیری پس از پایان مرحله",
+          "priority": "normal",
+          "dueInHours": 72
+        }
+      }
+    ]
+  }
+}

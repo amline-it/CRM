@@ -1,0 +1,120 @@
+{
+  "key": "requirements",
+  "version": 1,
+  "name": "فرایند نیازمندی‌ها",
+  "description": "ثبت نیازمندی (درخواست ملک) و نمایش آن طبق سطح دسترسی، سپس تطبیق با آگهی‌ها. مطابق فلوچارت Crm7LIght (زیرگراف ۴، شاخه نیازمندی‌ها).",
+  "context": "requirements",
+  "initial": "requirements_start",
+  "roles": {
+    "staff": "کارمند/کارشناس CRM",
+    "admin": "مدیر",
+    "system": "موتور و رویدادهای همگام‌سازی سمت سرور اصلی"
+  },
+  "accessLevels": {
+    "public": "قابل نمایش عمومی (کاربران ثبت‌نام‌شده)",
+    "agents": "فقط مشاوران املاک",
+    "staff": "فقط کارکنان CRM"
+  },
+  "states": [
+    { "key": "requirements_start", "name": "ثبت نیازمندی", "type": "start" },
+    { "key": "requirements_visible", "name": "نمایش نیازمندی‌ها طبق دسترسی", "type": "process", "node": "AE1" },
+    { "key": "requirements_matching", "name": "تطبیق با آگهی‌های موجود", "type": "process" },
+    { "key": "requirements_matched", "name": "ارائه پیشنهادها", "type": "process" },
+    { "key": "requirements_fulfilled", "name": "نیازمندی تأمین شد", "type": "terminal", "outcome": "fulfilled" },
+    { "key": "requirements_expired", "name": "انقضای نیازمندی", "type": "terminal", "outcome": "expired" },
+    { "key": "requirements_cancelled", "name": "لغو توسط متقاضی", "type": "terminal", "outcome": "cancelled" }
+  ],
+  "transitions": [
+    {
+      "key": "set_access_level",
+      "name": "تعیین سطح دسترسی نمایش",
+      "from": ["requirements_start"],
+      "to": "requirements_visible",
+      "kind": "choice",
+      "origin": "either",
+      "actors": ["staff", "admin", "system"],
+      "options": [
+        { "value": "public", "label": "عمومی", "to": "requirements_visible", "effects": [{ "key": "set_access_level", "params": { "level": "public" } }] },
+        { "value": "agents", "label": "فقط مشاوران املاک", "to": "requirements_visible", "effects": [{ "key": "set_access_level", "params": { "level": "agents" } }] },
+        { "value": "staff", "label": "فقط کارکنان CRM", "to": "requirements_visible", "effects": [{ "key": "set_access_level", "params": { "level": "staff" } }] }
+      ]
+    },
+    {
+      "key": "match_requirements",
+      "name": "تطبیق با آگهی‌ها",
+      "from": ["requirements_visible"],
+      "to": "requirements_matching",
+      "kind": "action",
+      "origin": "either",
+      "actors": ["staff", "admin", "system"],
+      "effects": [{ "key": "record_event", "params": { "kind": "requirements.matching_started" } }]
+    },
+    {
+      "key": "publish_matches",
+      "name": "ارائه پیشنهادهای تطبیق‌یافته",
+      "from": ["requirements_matching"],
+      "to": "requirements_matched",
+      "kind": "action",
+      "origin": "crm",
+      "actors": ["staff", "admin"],
+      "guards": [{ "key": "matches_found", "params": {} }],
+      "effects": [
+        { "key": "record_event", "params": { "kind": "requirements.matches_published" } }, { "key": "set_requirement_status", "params": { "status": "matched" } },
+        { "key": "notify_parties", "params": { "template": "requirement_matches" } }
+      ]
+    },
+    {
+      "key": "back_to_visible",
+      "name": "بازگشت به نمایش عمومی",
+      "from": ["requirements_matched"],
+      "to": "requirements_visible",
+      "kind": "action",
+      "origin": "crm",
+      "actors": ["staff", "admin"],
+      "effects": [{ "key": "record_event", "params": { "kind": "requirements.reopened" } }, { "key": "set_requirement_status", "params": { "status": "open" } }]
+    },
+    {
+      "key": "fulfill_requirement",
+      "name": "تأمین نیازمندی",
+      "from": ["requirements_matched"],
+      "to": "requirements_fulfilled",
+      "kind": "action",
+      "origin": "crm",
+      "actors": ["staff", "admin"],
+      "guards": [{ "key": "has_reason", "params": {} }],
+      "effects": [
+        { "key": "record_event", "params": { "kind": "requirements.fulfilled" } }, { "key": "set_requirement_status", "params": { "status": "fulfilled" } },
+        { "key": "close_case", "params": { "outcome": "fulfilled" } }
+      ]
+    },
+    {
+      "key": "expire_requirement",
+      "name": "انقضای نیازمندی",
+      "from": ["requirements_visible", "requirements_matched"],
+      "to": "requirements_expired",
+      "kind": "auto",
+      "origin": "system",
+      "actors": ["system", "staff", "admin"],
+      "guards": [{ "key": "requirement_expired", "params": {} }],
+      "effects": [{ "key": "record_event", "params": { "kind": "requirements.expired" } }, { "key": "set_requirement_status", "params": { "status": "expired" } }, { "key": "close_case", "params": { "outcome": "expired" } }]
+    },
+    {
+      "key": "cancel_requirement",
+      "name": "لغو توسط متقاضی",
+      "from": ["requirements_visible", "requirements_matched"],
+      "to": "requirements_cancelled",
+      "kind": "action",
+      "origin": "either",
+      "actors": ["staff", "admin", "system"],
+      "guards": [{ "key": "has_reason", "params": {} }],
+      "triggerEvent": "requirements.cancelled",
+      "effects": [{ "key": "record_event", "params": { "kind": "requirements.cancelled" } }, { "key": "set_requirement_status", "params": { "status": "cancelled" } }, { "key": "close_case", "params": { "outcome": "cancelled" } }]
+    }
+  ],
+  "crm": {
+    "onTerminal": [
+      { "key": "record_event", "params": { "kind": "crm.timeline" } },
+      { "key": "create_followup_task", "params": { "when": "needsFollowup", "title": "پیگیری نیازمندی", "priority": "normal", "dueInHours": 72 } }
+    ]
+  }
+}

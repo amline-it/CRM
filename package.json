@@ -1,0 +1,36 @@
+{
+  "name": "crm-realestate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRM املاک — موتور گردش‌کار داده‌محور، پنل کارمندی، سینک با سرور اصلی",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate": "node --no-warnings scripts/migrate.mjs",
+    "seed": "node --no-warnings scripts/seed.mjs",
+    "e2e": "node --no-warnings scripts/e2e.mjs",
+    "setup": "npm run migrate && npm run seed",
+    "docker:build": "docker build -t crm-realestate ."
+  },
+  "dependencies": {
+    "jose": "6.2.12",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.6.0",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

@@ -1,0 +1,21 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# داده و محیط
+data/
+.env
+.env.local
+.env.*.local
+uploads/
+
+# لاگ‌ها و ابزار
+*.log
+.DS_Store
+.vscode/
+.idea/
