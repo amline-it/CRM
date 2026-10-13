@@ -22,6 +22,7 @@ export type Permission =
   | "requirement.manage"
   | "user.view"
   | "task.manage"
+  | "referral.create"
   | "referral.manage"
   | "service.manage"
   | "workflow.manage"
@@ -43,6 +44,7 @@ const STAFF_PERMISSIONS: Permission[] = [
   "requirement.manage",
   "user.view",
   "task.manage",
+  "referral.create",
   "report.view",
 ];
 

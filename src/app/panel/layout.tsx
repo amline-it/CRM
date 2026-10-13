@@ -43,6 +43,10 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       ],
     },
     {
+      title: "کانبان ارجاع",
+      items: [{ href: "/panel/kanban", label: "تخته ارجاع درون‌سازمانی" }],
+    },
+    {
       title: "مدیریت",
       items: [
         { href: "/panel/services", label: "خدمات و قیمت‌ها", adminOnly: true },

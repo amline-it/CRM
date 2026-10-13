@@ -14,6 +14,8 @@ export interface StaffRow {
   role: "staff" | "admin";
   active: number;
   sso_subject: string | null;
+  org_unit: string | null;
+  title: string | null;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -45,28 +47,56 @@ export function createStaff(input: {
   fullName: string;
   role: "staff" | "admin";
   ssoSubject?: string | null;
+  orgUnit?: string | null;
+  title?: string | null;
 }): string {
   const id = newId("staff");
   const now = nowIso();
   run(
-    `INSERT INTO staff (id, username, password_hash, full_name, role, active, sso_subject, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-    [id, input.username, input.passwordHash, input.fullName, input.role, input.ssoSubject ?? null, now, now],
+    `INSERT INTO staff (id, username, password_hash, full_name, role, active, sso_subject, org_unit, title, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      input.username,
+      input.passwordHash,
+      input.fullName,
+      input.role,
+      input.ssoSubject ?? null,
+      input.orgUnit ?? null,
+      input.title ?? null,
+      now,
+      now,
+    ],
   );
   return id;
 }
 
-export function updateStaff(id: string, patch: { fullName?: string; role?: "staff" | "admin"; active?: boolean; passwordHash?: string | null }): void {
+export function updateStaff(
+  id: string,
+  patch: {
+    fullName?: string;
+    role?: "staff" | "admin";
+    active?: boolean;
+    passwordHash?: string | null;
+    orgUnit?: string | null;
+    title?: string | null;
+  },
+): void {
   const current = findStaffById(id);
   if (!current) return;
-  run("UPDATE staff SET full_name = ?, role = ?, active = ?, password_hash = ?, updated_at = ? WHERE id = ?", [
-    patch.fullName ?? current.full_name,
-    patch.role ?? current.role,
-    patch.active === undefined ? current.active : patch.active ? 1 : 0,
-    patch.passwordHash === undefined ? current.password_hash : patch.passwordHash,
-    nowIso(),
-    id,
-  ]);
+  run(
+    `UPDATE staff SET full_name = ?, role = ?, active = ?, password_hash = ?, org_unit = ?, title = ?, updated_at = ? WHERE id = ?`,
+    [
+      patch.fullName ?? current.full_name,
+      patch.role ?? current.role,
+      patch.active === undefined ? current.active : patch.active ? 1 : 0,
+      patch.passwordHash === undefined ? current.password_hash : patch.passwordHash,
+      patch.orgUnit === undefined ? current.org_unit : patch.orgUnit ?? null,
+      patch.title === undefined ? current.title : patch.title ?? null,
+      nowIso(),
+      id,
+    ],
+  );
 }
 
 export function touchStaffLogin(id: string): void {

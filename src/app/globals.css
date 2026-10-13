@@ -604,3 +604,211 @@ button:disabled {
     padding: 14px;
   }
 }
+
+/* ── کانبان ارجاع درون‌سازمانی ────────────────────────────────────── */
+
+.flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.flow-steps li {
+  position: relative;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.flow-steps li:not(:last-child)::after {
+  content: "←";
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.kanban {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.kanban-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kanban-scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  align-items: flex-start;
+}
+.kanban-col {
+  flex: 0 0 290px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+}
+.kanban-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  color: #fff;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.kanban-col-name {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.kanban-col-desc {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.kanban-cards {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.kanban-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  padding: 18px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.kard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-right: 4px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+.kard.status-new { border-right-color: #94a3b8; }
+.kard.status-in_review { border-right-color: var(--info); }
+.kard.status-waiting_info { border-right-color: var(--warning); }
+.kard.status-returned_correction { border-right-color: var(--danger); }
+.kard.status-done { border-right-color: var(--success); }
+.kard-top {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.kard-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  margin-bottom: 2px;
+}
+.kard-code { color: var(--text-muted); direction: ltr; display: inline-block; }
+.kard-meta, .kard-path { color: var(--text-muted); margin-top: 4px; }
+.kard-actions { margin-top: 8px; display: flex; justify-content: flex-end; }
+
+/* مودال */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 32, 58, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 50;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  width: min(620px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 18px 20px;
+  box-shadow: 0 24px 60px rgba(8, 20, 40, 0.35);
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.modal-head h3 { margin: 0; font-size: 16px; }
+.alert-row:empty { display: none; }
+
+.quick-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 14px;
+  background: var(--surface-2);
+}
+.quick-box-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: var(--primary-dark);
+}
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.refer-form .detected-unit {
+  font-size: 12.5px;
+  background: var(--info-soft);
+  color: var(--info);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+/* مسیر ارجاع */
+.referral-path {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+.referral-path.empty { color: var(--text-muted); font-size: 12.5px; }
+.rp-title { font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; }
+.rp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rp-list li { font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rp-arrow { color: var(--primary); font-weight: 700; }
+.rp-reason { color: var(--text-muted); }
+.rp-time { margin-right: auto; }
+
+/* مدیریت واحدها */
+.unit-edit {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--surface-2);
+}
+
+/* حالت‌های درگ‌انددراپ کانبان */
+.kanban-col.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: -4px;
+  background: var(--primary-soft);
+}
+.kanban-col.dragging-col { opacity: 0.55; }
+.kanban-col-head.col-draggable { cursor: grab; }
+.kanban-col-head.col-draggable:active { cursor: grabbing; }
+.kard.dragging { opacity: 0.5; transform: rotate(1deg); cursor: grabbing; }
+.kard[draggable="true"] { cursor: grab; }

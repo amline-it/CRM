@@ -46,6 +46,39 @@ export const ACCESS_LEVEL_LABELS: Record<string, string> = {
   staff: "کارشناسان داخلی",
 };
 
+/** وضعیت کارت در کانبان ارجاع (درون واحد) */
+export const KANBAN_STATUS_LABELS: Record<string, string> = {
+  new: "تازه‌وارد",
+  in_review: "در حال بررسی",
+  waiting_info: "منتظر اطلاعات",
+  returned_correction: "برگشت برای اصلاح",
+  done: "انجام‌شده",
+};
+
+/** لحن (رنگ نشان) هر وضعیت کانبان برای نمایش */
+export const KANBAN_STATUS_TONE: Record<string, "muted" | "info" | "warning" | "danger" | "success"> = {
+  new: "muted",
+  in_review: "info",
+  waiting_info: "warning",
+  returned_correction: "danger",
+  done: "success",
+};
+
+/** نوع ارجاع: به همکار یا به واحد */
+export const REFERRAL_KIND_LABELS: Record<string, string> = {
+  colleague: "همکار",
+  unit: "واحد",
+};
+
+/** اقدامات مسئول جدید روی کارت */
+export const KANBAN_ACTION_LABELS: Record<string, string> = {
+  start_review: "شروع رسیدگی",
+  need_info: "نیاز به اطلاعات",
+  return_correction: "برگشت برای اصلاح",
+  rerefer: "ارجاع مجدد",
+  complete: "اتمام کار",
+};
+
 export const CONTRACT_TYPE_LABELS: Record<string, string> = {
   rent: "اجاره",
   sale: "خرید و فروش",

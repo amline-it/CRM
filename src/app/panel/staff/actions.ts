@@ -43,8 +43,17 @@ export async function createStaffAction(_prev: ActionState, form: FormData): Pro
     if (!/^[a-zA-Z0-9._-]{3,}$/.test(username)) return { error: "نام کاربری باید حداقل ۳ کاراکتر انگلیسی/عدد باشد" };
     if (People.findStaffByUsername(username)) return { error: "این نام کاربری قبلاً ثبت شده است" };
 
-    const id = People.createStaff({ username, fullName, role, passwordHash: hashPassword(password) });
-    audit(session, "staff.create", id, { username, role });
+    const orgUnit = text(form, "orgUnit");
+    const title = text(form, "title");
+    const id = People.createStaff({
+      username,
+      fullName,
+      role,
+      passwordHash: hashPassword(password),
+      orgUnit: orgUnit ?? null,
+      title: title ?? null,
+    });
+    audit(session, "staff.create", id, { username, role, orgUnit });
     revalidatePath("/panel/staff");
     return { message: `کارشناس «${fullName}» ایجاد شد` };
   } catch (err) {
@@ -71,10 +80,14 @@ export async function updateStaffAction(_prev: ActionState, form: FormData): Pro
       return { error: "حداقل یک مدیر باید فعال بماند" };
     }
 
+    const orgUnit = text(form, "orgUnit");
+    const title = text(form, "title");
     People.updateStaff(staffId, {
       fullName: text(form, "fullName") ?? undefined,
       role: role ?? undefined,
       active: active === null ? undefined : active === "true",
+      orgUnit: orgUnit ?? null,
+      title: title ?? null,
     });
     audit(session, "staff.update", staffId, { role, active });
     revalidatePath("/panel/staff");
